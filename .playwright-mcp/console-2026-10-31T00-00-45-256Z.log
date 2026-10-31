@@ -1,0 +1,26 @@
+[   26367ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://bank.ecitic.com/favicon.ico:0
+[   26970ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.czbank.com/favicon.ico:0
+[   27027ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://www.bochk.com/favicon.ico:0
+[   27123ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.hsbc.com.hk/favicon.ico:0
+[   27214ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.bankofshanghai.com/favicon.ico:0
+[   27275ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://weixin.qq.com/favicon.ico:0
+[   27275ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://www.unionpay.com/favicon.ico:0
+[   27349ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.hxb.com.cn/favicon.ico:0
+[   27442ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.pnc.com/favicon.ico:0
+[   28268ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://www.njcb.com.cn/favicon.ico:0
+[   28486ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://www.ctbcbank.com/favicon.ico:0
+[   39260ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.pnc.com/favicon.ico:0
+[   41071ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.td.com/favicon.ico:0
+[   41073ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.hsbc.co.uk/favicon.ico:0
+[   41535ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.natwest.com/favicon.ico:0
+[   42363ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.revolut.com/favicon.ico:0
+[   42927ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://group.bnpparibas/favicon.ico:0
+[   43053ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://www.commerzbank.de/favicon.ico:0
+[   43375ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.societegenerale.com/favicon.ico:0
+[   44024ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.ing.com/favicon.ico:0
+[   44069ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.bbva.com/favicon.ico:0
+[   44421ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://www.ubs.com/favicon.ico:0
+[   44756ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://www.bk.mufg.jp/favicon.ico:0
+[   48273ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.cimb.com/favicon.ico:0
+[   48933ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://www.sbi.co.in/favicon.ico:0
+[   49284ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://www.hdfcbank.com/favicon.ico:0
