@@ -15,7 +15,7 @@
   --text-4: rgba(60, 60, 67, 0.3);
 
   /* 品牌 / 语义色 */
-  --accent: #0a84ff;
+  --accent: #0b8873;
   --accent-ink: #ffffff;
   --positive: #34c759;   /* 资产 / 上涨 */
   --negative: #ff3b30;   /* 负债 / 下跌 */
@@ -62,7 +62,7 @@
     --text-2: #ebebf5;
     --text-3: rgba(235, 235, 245, 0.6);
     --text-4: rgba(235, 235, 245, 0.3);
-    --accent: #0a84ff;
+    --accent: #2fb8a0;
     --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
     --shadow-pop: 0 10px 40px rgba(0,0,0,0.6);
     --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
@@ -78,6 +78,7 @@ html[data-theme="dark"] {
   --separator:rgba(84,84,88,.36); --separator-strong:rgba(84,84,88,.6);
   --text:#fff; --text-2:#ebebf5; --text-3:rgba(235,235,245,.6); --text-4:rgba(235,235,245,.3);
   --shadow-card:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.4);
+  --accent:#2fb8a0;
   --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
   --cat-5:#d55181; --cat-6:#008300; --cat-7:#9085e9; --cat-8:#e66767;
   --chart-surface:#1a1a19; --chart-grid:rgba(235,235,245,0.12);
@@ -86,6 +87,7 @@ html[data-theme="light"] {
   --bg:#f2f2f7; --bg-elevated:#fff; --card:#fff; --card-2:#f7f7fa;
   --separator:rgba(60,60,67,.12); --separator-strong:rgba(60,60,67,.22);
   --text:#1c1c1e; --text-2:#3c3c43; --text-3:rgba(60,60,67,.6); --text-4:rgba(60,60,67,.3);
+  --accent:#0b8873;
   --cat-1:#2a78d6; --cat-2:#eb6834; --cat-3:#1baf7a; --cat-4:#eda100;
   --cat-5:#e87ba4; --cat-6:#008300; --cat-7:#6250d6; --cat-8:#e34948;
   --chart-surface:#fcfcfb; --chart-grid:rgba(60,60,67,0.10);
@@ -340,3 +342,76 @@ svg.chevron { width:7px; height:12px; }
 .tl-stats .st:last-child { align-items:flex-end; }
 .tl-stats .k { font-size:11px; color:var(--text-3); }
 .tl-stats .v { font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+/* ============================================================
+   设计刷新（参考 Codex 版本）：净资产卡 / 指标面板 / 图表 / 还款时间线
+   ============================================================ */
+/* 净资产大卡：主题色背景 */
+.hero {
+  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 68%, #06362e));
+  color: #fff; border-radius: var(--radius-l); padding: 22px 24px; margin-bottom: 16px;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.hero-label { display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#ffffffcf; font-weight:500; }
+.hero-label .hero-date { font-size:11px; color:#ffffff9e; }
+.hero-value { font-family:var(--num); font-size:38px; font-weight:750; letter-spacing:-0.03em; margin:14px 0 0; font-variant-numeric:tabular-nums; white-space:nowrap; line-height:1.1; }
+.hero-value .cur { font-size:23px; font-weight:400; opacity:.72; margin-right:3px; letter-spacing:-0.01em; }
+.hero-cmp { display:flex; gap:28px; margin-top:22px; flex-wrap:wrap; }
+.hero-cmp .cmp { font-size:11px; color:#ffffffcf; display:flex; align-items:baseline; gap:6px; }
+.hero-cmp .cmp b { font-family:var(--num); font-variant-numeric:tabular-nums; font-weight:600; font-size:13px; }
+.hero .delta-up { color:#d8f6ec; }
+.hero .delta-down { color:#ffdccf; }
+.hero-cmp .pct { font-size:10px; background:#ffffff1f; padding:2px 5px; border-radius:4px; margin-left:2px; }
+
+/* 指标面板：2×2，分隔线 */
+.metrics-panel { background:var(--card); border-radius:var(--radius-l); box-shadow:var(--shadow-card); display:grid; grid-template-columns:1fr 1fr; overflow:hidden; margin-bottom:16px; }
+.metric-box { padding:15px 17px; display:flex; flex-direction:column; justify-content:center; }
+.metric-box:nth-child(-n+2) { border-bottom:0.5px solid var(--separator); }
+.metric-box:nth-child(odd) { border-right:0.5px solid var(--separator); }
+.metric-box .metric-label { font-size:12px; color:var(--text-3); display:flex; align-items:center; gap:6px; }
+.metric-box .metric-label .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.metric-box .metric-val { font-family:var(--num); font-size:22px; font-weight:650; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; margin-top:10px; }
+.metric-box .metric-val.neg { color:var(--negative); }
+
+/* 图表卡工具条 */
+.chart-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
+.chart-head .seg { background:var(--card-2); }
+.range-sel { font-size:12px; min-height:30px; padding:5px 10px; border-radius:8px; border:0.5px solid var(--separator); background:var(--card-2); color:var(--text-2); width:auto; }
+
+/* ---------- 还款时间线（线从卡片内部穿过） ---------- */
+.sch-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:2px; }
+.sch-head h3 { font-size:15px; font-weight:700; margin:0; }
+.sch-head h3 span { margin-left:7px; font-size:11px; color:var(--text-3); font-weight:400; }
+.sch-locate { background:transparent; color:var(--accent); font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:5px; padding:4px 2px; white-space:nowrap; flex-shrink:0; }
+.sch-locate svg { width:14px; height:14px; flex-shrink:0; }
+.sch-filters { display:flex; gap:4px; margin:14px 0 14px; flex-wrap:wrap; }
+.sch-filters button { border:0; background:var(--card-2); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--text-3); font-weight:600; }
+.sch-filters button.active { background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--accent); }
+.sch-scroll { max-height:60vh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+.sch-list { list-style:none; margin:0; padding:0; }
+.sch-item { --c:var(--text-3); --b:var(--separator); --bg:var(--card); padding:0 0 8px; }
+.sch-item.paid { --c:var(--positive); --b:color-mix(in srgb, var(--positive) 32%, transparent); --bg:color-mix(in srgb, var(--positive) 9%, var(--card)); }
+.sch-item.current { --c:var(--warning); --b:color-mix(in srgb, var(--warning) 48%, transparent); --bg:color-mix(in srgb, var(--warning) 9%, var(--card)); }
+.sch-item.planned { --c:var(--accent); --b:color-mix(in srgb, var(--accent) 32%, transparent); --bg:color-mix(in srgb, var(--accent) 9%, var(--card)); }
+.sch-card { position:relative; display:grid; grid-template-columns:48px 30px minmax(0,1fr); align-items:stretch; padding:10px 13px 10px 10px; border:1px solid var(--b); border-radius:11px; background:var(--bg); }
+.sch-item.current .sch-card { border-width:1.5px; }
+.sch-date { display:flex; flex-direction:column; justify-content:center; gap:2px; color:var(--text-3); font-variant-numeric:tabular-nums; }
+.sch-date span { font-size:10px; }
+.sch-date strong { font-size:14px; color:var(--text-2); font-weight:700; }
+.sch-axis { position:relative; display:grid; place-items:center; }
+.sch-axis::before { content:''; position:absolute; width:2px; top:-22px; bottom:-22px; background:var(--separator); }
+.sch-item:first-child .sch-axis::before { top:50%; }
+.sch-item:last-child .sch-axis::before { bottom:50%; }
+.sch-marker { position:relative; z-index:1; display:grid; place-items:center; width:25px; height:25px; border-radius:50%; background:var(--bg); color:var(--c); }
+.sch-marker svg { width:14px; height:14px; display:block; }
+.sch-item.paid .sch-marker { background:var(--c); color:#fff; width:21px; height:21px; box-shadow:0 0 0 3px var(--bg); }
+.sch-content { min-width:0; padding-left:7px; display:flex; flex-direction:column; justify-content:center; }
+.sch-amounts { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.sch-total { font-family:var(--num); font-size:18px; font-weight:700; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.sch-dl { margin:0; display:flex; flex-direction:column; gap:3px; }
+.sch-dl > div { display:flex; justify-content:flex-end; align-items:center; gap:9px; font-size:10.5px; }
+.sch-dl dt { margin:0; color:var(--text-3); }
+.sch-dl dd { margin:0; color:var(--text-2); font-weight:600; font-variant-numeric:tabular-nums; }
+.sch-bottom { display:flex; justify-content:space-between; align-items:center; gap:10px; border-top:1px solid var(--b); padding-top:7px; margin-top:8px; font-size:10.5px; color:var(--text-3); }
+.sch-bottom b { color:var(--text-2); font-weight:600; font-variant-numeric:tabular-nums; margin-left:6px; }
+.sch-empty { text-align:center; color:var(--text-3); padding:50px 10px; font-size:13px; }

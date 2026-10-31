@@ -55,6 +55,5 @@ export function render() {
     root.appendChild(rows);
   }
 
-  root.appendChild(h('button', { class: 'fab', html: icon('plus'), onclick: openTypePicker, 'aria-label': '新增账户' }));
   return root;
 }

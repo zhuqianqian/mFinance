@@ -32,7 +32,7 @@ export function lineChart(points, { height = 190, fmt = moneyShort } = {}) {
     svg.appendChild(svgEl('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: grid, 'stroke-width': 1 }));
   }
 
-  const accent = cssVar('--cat-1') || cssVar('--accent');
+  const accent = cssVar('--accent');
   // 面积
   const area = `M${xs[0]},${yOf(vals[0])} ` + xs.map((x, i) => `L${x},${yOf(vals[i])}`).join(' ') +
     ` L${xs[xs.length - 1]},${H - padB} L${xs[0]},${H - padB} Z`;

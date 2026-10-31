@@ -275,56 +275,51 @@ function prepayForm(d, rebuild) {
 
 /* 还款计划（时间线卡片，传入已清洗的贷款账户） */
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
-const CAL = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zm12 7v10H5V9z"/></svg>';
+const CAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/><path d="M12 13v3l2 1"/></svg>';
 const BOLT = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>';
-const m0 = (v) => money(v, { decimals: 0 });
+const CIRCLE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/></svg>';
+const CIRCLEDOT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>';
 
 export function openSchedule(l) {
   const rows = generateSchedule(l);
-  const body = h('div', {});
   const td = today();
-  const tl = h('div', { class: 'tl' });
-  let nextMarked = false;
-  rows.forEach((r) => {
+  let currentId = null;
+  for (const r of rows) { if (r.kind === 'pay' && r.date > td) { currentId = 'p' + r.index; break; } }
+
+  const list = h('ol', { class: 'sch-list' });
+  rows.forEach((r, i) => {
     if (r.kind === 'prepay') {
-      const executed = r.date <= td;
-      tl.appendChild(tlItem({
-        y: r.date.slice(0, 4), d: r.date.slice(5), state: executed ? 'paid' : 'prepay',
-        dot: executed ? BOLT : CAL, amt: r.amount,
-        lab: '提前还款 · ' + (r.mode === 'shorten' ? '缩期' : '降月供'),
-        principal: r.amount, interest: r.interest || 0, remain: r.remaining
-      }));
+      const done = r.date <= td;
+      list.appendChild(schItem({ date: r.date, cls: done ? 'paid' : 'planned', marker: done ? BOLT : CAL, current: false, total: r.amount, principal: r.amount, interest: r.interest || 0, remain: r.remaining }));
     } else {
       const paid = r.date <= td;
-      const state = paid ? 'paid' : (nextMarked ? 'future' : 'next');
-      if (!paid) nextMarked = true;
-      tl.appendChild(tlItem({
-        y: r.date.slice(0, 4), d: r.date.slice(5), state, dot: paid ? CHECK : '',
-        amt: r.payment, lab: paid ? '已还' : (state === 'next' ? '下一期' : '待还'),
-        principal: r.principal, interest: r.interest, remain: r.remaining
-      }));
+      const current = ('p' + r.index) === currentId;
+      list.appendChild(schItem({ date: r.date, cls: paid ? 'paid' : (current ? 'current' : ''), marker: paid ? CHECK : (current ? CIRCLEDOT : CIRCLE), current, total: r.payment, principal: r.principal, interest: r.interest, remain: r.remaining }));
     }
   });
-  body.appendChild(tl);
-  const ctl = openSheet('还款计划', body);
-  // 自动定位到下一个待还卡片
-  setTimeout(() => { const el = ctl.sheet.querySelector('.tl-item.next'); if (el) el.scrollIntoView({ block: 'center' }); }, 360);
+  const scroll = h('div', { class: 'sch-scroll' }, [list]);
+  openSheet('还款计划', scroll);
+  setTimeout(() => { const el = list.querySelector('.sch-item.current') || list.querySelector('.sch-item'); if (el) el.scrollIntoView({ block: 'center' }); }, 120);
 }
 
-function tlItem(o) {
-  return h('div', { class: 'tl-item ' + o.state }, [
-    h('div', { class: 'tl-date' }, [h('span', { class: 'y', text: o.y }), h('span', { class: 'd', text: o.d })]),
-    h('div', { class: 'tl-dotcol' }, [h('div', { class: 'tl-dot ' + o.state, html: o.dot })]),
-    h('div', { class: 'tl-card' }, [
-      h('div', { class: 'tl-head' }, [h('span', { class: 'tl-amt', text: money(o.amt) }), h('span', { class: 'tl-lab', text: o.lab })]),
-      h('div', { class: 'tl-stats' }, [
-        stat('本金', money(o.principal)), stat('利息', money(o.interest)), stat('剩余', money(o.remain))
+function schItem(e) {
+  return h('li', { class: 'sch-item ' + e.cls }, [
+    h('article', { class: 'sch-card' }, [
+      h('time', { class: 'sch-date' }, [h('span', { text: e.date.slice(0, 4) }), h('strong', { text: e.date.slice(5) })]),
+      h('div', { class: 'sch-axis' }, [h('span', { class: 'sch-marker', html: e.marker })]),
+      h('div', { class: 'sch-content' }, [
+        h('div', { class: 'sch-amounts' }, [
+          h('strong', { class: 'sch-total', text: money(e.total) }),
+          h('dl', { class: 'sch-dl' }, [
+            h('div', {}, [h('dt', { text: '本金' }), h('dd', { text: money(e.principal) })]),
+            h('div', {}, [h('dt', { text: '利息' }), h('dd', { text: money(e.interest) })])
+          ])
+        ]),
+        h('div', { class: 'sch-bottom' }, [h('span', { html: `剩余<b>${money(e.remain)}</b>` })])
       ])
     ])
   ]);
 }
-function stat(k, v) { return h('div', { class: 'st' }, [h('span', { class: 'k', text: k }), h('span', { class: 'v', text: v })]); }
-function statMini(label, value) { return h('div', { class: 'stat' }, [h('div', { class: 'stat-label', text: label }), h('div', { class: 'stat-value', style: 'font-size:18px', text: value })]); }
 
 /* ---------- 入口 ---------- */
 export function openAccountForm(existing, presetType) {

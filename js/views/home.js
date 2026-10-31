@@ -1,21 +1,28 @@
-// js/views/home.js —— 首页：净资产卡 + 关键指标 + 趋势/构成图
-import { h, money, moneyShort, pct } from '../util.js';
-import { headline, series, totalsAsOf, reconcileDates, categoryOf } from '../models.js';
+// js/views/home.js —— 首页：净资产卡 + 指标面板 + 趋势(可切指标/区间) + 资产构成
+import { h, money, moneyShort, pct, clear } from '../util.js';
+import { headline, series, reconcileDates } from '../models.js';
 import { getAccounts } from '../store.js';
 import { icon } from '../icons.js';
 import { lineChart, donutChart } from '../charts.js';
 
-// 资产构成分类 -> 固定颜色槽（色随实体，不随排序）
 const CAT_SLOT = { '银行储蓄': 0, '网络钱包': 1, '投资理财': 2, '固定资产': 3, '公积金': 4, '其他': 5 };
-function catColorVar(cat) { return `var(--cat-${(CAT_SLOT[cat] ?? 7) + 1})`; }
+const catColorVar = (cat) => `var(--cat-${(CAT_SLOT[cat] ?? 7) + 1})`;
+function cssResolve(varExpr) {
+  const m = varExpr.match(/--cat-\d/);
+  return m ? (getComputedStyle(document.documentElement).getPropertyValue(m[0]).trim() || '#888') : varExpr;
+}
+// 把 money 的 ¥ 拆成小号前缀
+function heroAmount(n) {
+  const s = money(n);
+  return `<span class="cur">¥</span>${s.replace('¥', '')}`;
+}
 
 export function render() {
   const root = h('div');
   const dates = reconcileDates();
 
   root.appendChild(h('div', { class: 'nav-head' }, [
-    h('div', {}, [h('h1', { class: 'nav-title', text: '资产总览' }),
-      h('div', { class: 'nav-sub', text: dates.length ? `截至 ${dates[dates.length - 1]}` : '尚无对账记录' })])
+    h('div', {}, [h('h1', { class: 'nav-title', text: '财务总览' })])
   ]));
 
   const hl = headline();
@@ -28,70 +35,74 @@ export function render() {
     ]));
     return root;
   }
-
   const { cur, prev, yoy } = hl;
 
-  // 净资产 Hero
-  const hero = h('div', { class: 'hero' }, [
-    h('div', { class: 'hero-label', text: '净资产' }),
-    h('div', { class: 'hero-value', text: money(cur.net) }),
+  // 净资产大卡
+  root.appendChild(h('div', { class: 'hero' }, [
+    h('div', { class: 'hero-label' }, [h('span', { text: '净资产' }), h('span', { class: 'hero-date', text: `截至 ${cur.date}` })]),
+    h('div', { class: 'hero-value', html: heroAmount(cur.net) }),
     h('div', { class: 'hero-cmp' }, [cmp('环比', cur.net, prev && prev.net), cmp('同比', cur.net, yoy && yoy.net)])
-  ]);
-  root.appendChild(hero);
-
-  // 指标
-  root.appendChild(h('div', { class: 'stat-grid' }, [
-    statCard('总资产', money(cur.assets), '--positive'),
-    statCard('总负债', money(cur.liabilities), '--negative'),
-    statCard('流动资金', money(cur.liquid), '--teal'),
-    statCard('负债率', pct(cur.debtRatio), cur.debtRatio > 0.5 ? '--warning' : '--purple')
   ]));
 
-  // 趋势
-  const s = series();
-  const trend = h('div', { class: 'card' }, [
-    h('div', { style: 'display:flex;justify-content:space-between;align-items:center' }, [
-      h('div', { class: 'card-title', style: 'margin:0', text: '净资产趋势' }),
-      h('div', { class: 'muted', style: 'font-size:12px', text: `${s.length} 期` })
-    ]),
-    h('div', { style: 'height:8px' })
-  ]);
-  trend.appendChild(lineChart(s.map((p) => ({ date: p.date, value: p.net }))));
-  root.appendChild(trend);
+  // 指标面板 2×2
+  root.appendChild(h('div', { class: 'metrics-panel' }, [
+    metric('总资产', money(cur.assets), 'var(--positive)'),
+    metric('总负债', money(cur.liabilities), 'var(--negative)', true),
+    metric('流动资金', money(cur.liquid), 'var(--teal)'),
+    metric('负债率', pct(cur.debtRatio), cur.debtRatio > 0.5 ? 'var(--warning)' : 'var(--purple)')
+  ]));
 
-  // 构成
-  const comp = cur.composition;
-  const items = Object.entries(comp).sort((a, b) => b[1] - a[1])
+  // 趋势图（可切换指标与区间）
+  const s = series();
+  const state = { metric: 'net', range: 0 };
+  const chartBox = h('div', { style: 'margin-top:8px' });
+  function drawChart() {
+    clear(chartBox);
+    let data = state.range ? s.slice(-state.range) : s;
+    const isPct = state.metric === 'ratio';
+    const pts = data.map((p) => ({ date: p.date, value: isPct ? p.debtRatio : p.net }));
+    chartBox.appendChild(lineChart(pts, { fmt: isPct ? (v) => pct(v) : moneyShort }));
+  }
+  const seg = h('div', { class: 'seg', style: 'width:auto' });
+  [['net', '净资产'], ['ratio', '负债率']].forEach(([v, label]) => {
+    seg.appendChild(h('button', { class: state.metric === v ? 'active' : '', text: label, onclick: (e) => { state.metric = v; [...seg.children].forEach((b) => b.classList.remove('active')); e.target.classList.add('active'); drawChart(); } }));
+  });
+  const rangeSel = h('select', { class: 'range-sel', onchange: (e) => { state.range = +e.target.value; drawChart(); } }, [
+    h('option', { value: '0', text: '全部' }),
+    h('option', { value: '6', text: '近 6 期' }),
+    h('option', { value: '12', text: '近 12 期' })
+  ]);
+  const trend = h('div', { class: 'card' }, [
+    h('div', { class: 'chart-head' }, [seg, rangeSel]),
+    chartBox
+  ]);
+  root.appendChild(trend);
+  drawChart();
+
+  // 资产构成
+  const items = Object.entries(cur.composition).sort((a, b) => b[1] - a[1])
     .map(([label, value]) => ({ label, value, color: cssResolve(catColorVar(label)) }));
-  const compCard = h('div', { class: 'card' }, [
+  root.appendChild(h('div', { class: 'card' }, [
     h('div', { class: 'card-title', text: '资产构成' }),
     donutChart(items, { centerLabel: '总资产', total: cur.assets })
-  ]);
-  root.appendChild(compCard);
+  ]));
 
   return root;
 }
 
 function cmp(label, cur, base) {
-  if (base == null) return h('span', { class: 'cmp', html: `${label} <b class="muted">--</b>` });
+  if (base == null) return h('span', { class: 'cmp', html: `${label} <b style="color:#ffffff9e">--</b>` });
   const diff = cur - base;
   const rate = base !== 0 ? diff / Math.abs(base) : 0;
   const up = diff >= 0;
   const cls = up ? 'delta-up' : 'delta-down';
   const arrow = up ? '▲' : '▼';
-  return h('span', { class: 'cmp', html: `${label} <b class="${cls}">${arrow} ${moneyShort(Math.abs(diff))}</b> <span class="${cls}">(${pct(Math.abs(rate))})</span>` });
+  return h('span', { class: 'cmp', html: `${label} <b class="${cls}">${arrow} ${moneyShort(Math.abs(diff))}</b> <span class="pct ${cls}">${pct(Math.abs(rate))}</span>` });
 }
 
-function statCard(label, value, colorVar) {
-  return h('div', { class: 'stat' }, [
-    h('div', { class: 'stat-label' }, [h('span', { class: 'stat-dot', style: `background:var(${colorVar})` }), label]),
-    h('div', { class: 'stat-value', text: value })
+function metric(label, value, dotColor, liability) {
+  return h('div', { class: 'metric-box' }, [
+    h('div', { class: 'metric-label' }, [h('span', { class: 'dot', style: `background:${dotColor}` }), label]),
+    h('div', { class: 'metric-val' + (liability ? ' neg' : ''), text: value })
   ]);
-}
-
-// 把 var(--cat-n) 解析为具体色值（charts 需要实色做 SVG stroke）
-function cssResolve(varExpr) {
-  const m = varExpr.match(/--cat-\d/);
-  if (!m) return varExpr;
-  return getComputedStyle(document.documentElement).getPropertyValue(m[0]).trim() || '#888';
 }
