@@ -1,5 +1,5 @@
 /* 掌上资产 Service Worker —— app shell 预缓存，离线可用 */
-const CACHE = 'mfinance-v2';
+const CACHE = 'mfinance-v3'; // 与 js/views/settings.js 的 APP_VERSION 同步更新
 const IMG_CACHE = 'mfinance-img-v1';
 const SHELL = [
   './',
@@ -28,7 +28,8 @@ const SHELL = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL).catch(() => {})).then(() => self.skipWaiting())
+    // 升级时重新校验每个文件，避免把 HTTP 缓存中的旧页面带入新版本。
+    caches.open(CACHE).then((c) => c.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' })))).then(() => self.skipWaiting())
   );
 });
 

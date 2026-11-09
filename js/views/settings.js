@@ -2,6 +2,9 @@
 import { h, toast, confirmDialog, today, fmtDate, num } from '../util.js';
 import { getSettings, updateSettings, exportJSON, importJSON, wipeAll, getAccounts, getSnapshots, addAccount, putSnapshot } from '../store.js';
 
+// 发布时与 sw.js 的缓存版本同步，表示当前页面代码的版本。
+const APP_VERSION = 'v3';
+
 function applyThemeNow(t) {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', t);
@@ -49,7 +52,10 @@ export function render() {
     h('button', { class: 'row', style: 'color:var(--negative);justify-content:center;font-weight:600', text: '清空全部数据', onclick: async () => { if (await confirmDialog('将删除所有账户与快照，建议先导出备份。', { okText: '清空', danger: true })) { wipeAll(); toast('已清空'); location.hash = '#/home'; } } })
   ]));
 
-  root.appendChild(h('div', { class: 'muted', style: 'text-align:center;font-size:12px;margin-top:24px', text: 'mFinance · 数据仅存于本机浏览器' }));
+  root.appendChild(h('div', { class: 'muted', style: 'text-align:center;font-size:12px;margin-top:24px' }, [
+    h('div', { text: `mFinance · 应用版本 ${APP_VERSION}` }),
+    h('div', { style: 'margin-top:6px', text: '数据仅存于本机浏览器' })
+  ]));
   return root;
 
   function doExport() {

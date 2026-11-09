@@ -18,14 +18,7 @@ export const CASH_SUBKINDS = {
 
 /* 资产构成分类（用于首页环形图） */
 export function categoryOf(acc) {
-  if (acc.type === 'cash') {
-    if (acc.subKind === 'bank') return '银行储蓄';
-    if (acc.subKind === 'gongjijin') return '公积金';
-    return '网络钱包';
-  }
-  if (acc.type === 'fixed') return '固定资产';
-  if (acc.type === 'investment') return '投资理财';
-  return '其他';
+  return TYPES[acc.type]?.label || '其他';
 }
 
 /* 是否计入流动资金（账户可用 liquid 显式覆盖） */
@@ -65,6 +58,9 @@ export function liveValuation(acc, asOf = today()) {
 }
 
 export function fixedValue(acc, asOf = today()) {
+  if (acc.subKind === 'house' && acc.valuationUnitPrice != null && acc.valuationUnitPrice !== '' && +acc.area > 0) {
+    return +acc.valuationUnitPrice * +acc.area;
+  }
   if (acc.valuationOverride != null && acc.valuationOverride !== '') return +acc.valuationOverride;
   if (acc.subKind === 'house') {
     if (acc.unitPrice && acc.area) return (+acc.unitPrice) * (+acc.area);
@@ -72,13 +68,23 @@ export function fixedValue(acc, asOf = today()) {
   }
   if (acc.subKind === 'car') {
     const base = +acc.initialValue || 0;
-    const rate = +acc.depreciationRate || 0; // 年折损率小数
+    const rate = carMonthlyRate(acc);
     const start = acc.purchaseDate || acc.createdAt;
     if (!start || !rate) return base;
-    const years = Math.max(0, (parseDate(asOf) - parseDate(start)) / (365.25 * 86400000));
-    return base * Math.pow(1 - rate, years);
+    // 按天折算月数；与旧版按年折旧的时间口径保持一致。
+    const months = Math.max(0, (parseDate(asOf) - parseDate(start)) / (365.25 / 12 * 86400000));
+    return base * Math.pow(1 - rate, months);
   }
   return +acc.initialValue || 0;
+}
+
+// 旧账户仍可能只有年折损率，使用等效月复利率，避免直接当成月率。
+export function carMonthlyRate(acc) {
+  if (acc.monthlyDepreciationRate != null && acc.monthlyDepreciationRate !== '') {
+    return Math.min(1, Math.max(0, +acc.monthlyDepreciationRate || 0));
+  }
+  const annual = Math.min(1, Math.max(0, +acc.depreciationRate || 0));
+  return 1 - Math.pow(1 - annual, 1 / 12);
 }
 
 /* 账户一行展示用的金额与说明 */
@@ -88,7 +94,10 @@ export function accountDisplay(acc) {
   if (acc.type === 'credit') sub = `额度 ${fmtK(acc.totalLimit)} · 可用 ${fmtK(acc.availableCredit)}`;
   else if (acc.type === 'investment') sub = `${acc.code || ''} · ${(+acc.holdingQty || 0)}份 @ ${acc.latestPrice || '--'}`;
   else if (acc.type === 'loan') sub = '剩余本金';
-  else if (acc.type === 'fixed' && acc.subKind === 'house') sub = acc.unitPrice && acc.area ? `${acc.area}㎡ × ${acc.unitPrice}/㎡` : '';
+  else if (acc.type === 'fixed' && acc.subKind === 'house' && +acc.area > 0) {
+    const price = fixedValue(acc) / +acc.area;
+    sub = `${acc.area}㎡ × ${round2(price)}/㎡`;
+  }
   return { value, kind, sub };
 }
 function fmtK(n) { n = +n || 0; return n >= 10000 ? (n / 10000).toFixed(1) + '万' : n.toLocaleString('zh-CN'); }
@@ -107,11 +116,15 @@ export function reconcileDates() {
 export function totalsAsOf(date) {
   const accs = getAccounts({ includeArchived: true });
   let assets = 0, liabilities = 0, liquid = 0;
-  const composition = {};
+  const composition = {}, liabilityComposition = {};
   for (const acc of accs) {
     const snap = latestSnapOnOrBefore(acc.id, date);
     if (!snap) continue;
-    if (snap.kind === 'liability') { liabilities += snap.value; }
+    if (snap.kind === 'liability') {
+      liabilities += snap.value;
+      const cat = categoryOf(acc);
+      liabilityComposition[cat] = (liabilityComposition[cat] || 0) + snap.value;
+    }
     else {
       assets += snap.value;
       if (isLiquid(acc)) liquid += snap.value;
@@ -124,7 +137,7 @@ export function totalsAsOf(date) {
     date, assets, liabilities, liquid: round2(liquid),
     net: round2(assets - liabilities),
     debtRatio: assets > 0 ? liabilities / assets : 0,
-    composition
+    composition, liabilityComposition
   };
 }
 

@@ -1,7 +1,7 @@
 // js/views/account-detail.js —— 账户详情：基本信息 + 历史对账 + 贷款统计/操作
-import { h, money, moneyShort, pct, num, today, toast, confirmDialog, openSheet } from '../util.js';
+import { h, money, moneyShort, pct, num, today, toast, confirmDialog, openSheet, uid } from '../util.js';
 import { getAccount, snapshotsOf, updateAccount, deleteSnapshot } from '../store.js';
-import { TYPES, CASH_SUBKINDS, liveValuation, accountDisplay, fixedValue } from '../models.js';
+import { TYPES, CASH_SUBKINDS, liveValuation, accountDisplay, fixedValue, carMonthlyRate } from '../models.js';
 import { accountBadge, INSTITUTIONS, icon } from '../icons.js';
 import { METHODS, loanStats, advanceInterest } from '../loan.js';
 import { openAccountForm, openSchedule } from './account-form.js';
@@ -62,7 +62,8 @@ function assetBody(root, acc) {
     lines.push(['总额度', money(+acc.totalLimit || 0)], ['可用额度', money(+acc.availableCredit || 0)], ['当前欠款', money(debt), true]);
   } else if (acc.type === 'fixed') {
     if (acc.subKind === 'house') { lines.push(['单价', money(+acc.unitPrice || 0) + '/㎡'], ['面积', (+acc.area || 0) + ' ㎡']); }
-    if (acc.subKind === 'car') { lines.push(['购入价值', money(+acc.initialValue || 0)], ['年折损率', pct(+acc.depreciationRate || 0)], ['购入日期', acc.purchaseDate || '—']); }
+    if (acc.subKind === 'car') { lines.push(['购入价值', money(+acc.initialValue || 0)], ['月折损率', pct(carMonthlyRate(acc), 4)], ['购入日期', acc.purchaseDate || '—']); }
+    if (acc.subKind === 'house' && acc.valuationUnitPrice != null && acc.valuationUnitPrice !== '') lines.push(['手动估值单价', money(+acc.valuationUnitPrice) + '/㎡']);
     lines.push(['当前估值', money(fixedValue(acc))]);
     if (acc.valuationOverride != null && acc.valuationOverride !== '') lines.push(['手动估值', money(+acc.valuationOverride)]);
   } else if (acc.type === 'investment') {
@@ -159,9 +160,10 @@ async function delItem(acc, key, item) {
 
 /* 持久化的提前还款 / 利率变更表单 */
 function tInput(label, obj, key, { type = 'text', suffix = '' } = {}) {
-  const input = h('input', { type: type === 'number' ? 'text' : type, inputmode: type === 'number' ? 'decimal' : null, value: obj[key] ?? '', oninput: (e) => obj[key] = e.target.value });
-  const inner = suffix ? h('div', { style: 'position:relative' }, [input, h('span', { style: 'position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--text-3)', text: suffix })]) : input;
-  return h('div', { class: 'field' }, [h('label', { text: label }), inner]);
+  const id = uid();
+  const input = h('input', { id, type: type === 'number' ? 'text' : type, inputmode: type === 'number' ? 'decimal' : null, value: obj[key] ?? '', oninput: (e) => obj[key] = e.target.value });
+  const inner = suffix ? h('div', { class: 'input-unit' }, [input, h('span', { text: suffix })]) : input;
+  return h('div', { class: 'field' }, [h('label', { for: id, text: label }), inner]);
 }
 function tSeg(label, obj, key, opts) {
   const seg = h('div', { class: 'seg' });
@@ -181,13 +183,13 @@ function prepayForm(acc) {
   const amtF = tInput('提前还款金额', t, 'amount', { type: 'number', suffix: '元' });
   dateF.querySelector('input').addEventListener('input', refresh);
   amtF.querySelector('input').addEventListener('input', refresh);
-  const body = h('div', {}, [dateF, amtF, info, tSeg('方式', t, 'mode', [{ v: 'shorten', label: '缩短期限' }, { v: 'reduce', label: '减少月供' }])]);
+  const body = h('div', { class: 'inline-fields' }, [dateF, amtF, info, tSeg('方式', t, 'mode', [{ v: 'shorten', label: '缩短期限' }, { v: 'reduce', label: '减少月供' }])]);
   const save = h('button', { class: 'btn ghost', style: 'color:var(--accent);font-weight:700', text: '保存', onclick: () => { if (!num(t.amount)) { toast('请输入金额'); return; } updateAccount(acc.id, { prepayments: [...(acc.prepayments || []), { date: t.date, amount: num(t.amount), mode: t.mode }] }); ctl.close(); toast('已添加提前还款'); } });
   const ctl = openSheet('安排提前还款', body, { rightBtn: save });
 }
 function rateForm(acc) {
   const t = { effectiveDate: today(), newAnnualRate: '' };
-  const body = h('div', {}, [tInput('生效日期', t, 'effectiveDate', { type: 'date' }), tInput('新年利率', t, 'newAnnualRate', { type: 'number', suffix: '%' })]);
+  const body = h('div', { class: 'inline-fields' }, [tInput('生效日期', t, 'effectiveDate', { type: 'date' }), tInput('新年利率', t, 'newAnnualRate', { type: 'number', suffix: '%' })]);
   const save = h('button', { class: 'btn ghost', style: 'color:var(--accent);font-weight:700', text: '保存', onclick: () => { if (!num(t.newAnnualRate)) { toast('请输入利率'); return; } updateAccount(acc.id, { rateChanges: [...(acc.rateChanges || []), { effectiveDate: t.effectiveDate, newAnnualRate: num(t.newAnnualRate) / 100 }] }); ctl.close(); toast('已记录利率变更'); } });
   const ctl = openSheet('记录利率变更', body, { rightBtn: save });
 }

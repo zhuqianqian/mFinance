@@ -33,10 +33,10 @@ export function render() {
     return root;
   }
 
-  root.appendChild(h('div', { class: 'card', style: 'display:flex;align-items:center;justify-content:space-between;gap:10px' }, [
+  root.appendChild(h('div', { class: 'card reconcile-date' }, [
     h('div', {}, [h('div', { class: 'stat-label', text: '对账日期' }),
       h('div', { class: 'muted', style: 'font-size:12px;margin-top:2px', text: `设定对账日：每月 ${getSettings().reconcileDay} 日` })]),
-    h('input', { type: 'date', value: state.date, style: 'width:auto', onchange: (e) => { state.date = e.target.value; state.vals = {}; rerender(); } })
+    h('input', { type: 'date', 'aria-label': '对账日期', value: state.date, onchange: (e) => { if (!e.target.value) return; state.date = e.target.value; state.vals = {}; rerender(); } })
   ]));
 
   root.appendChild(h('div', { style: 'display:flex;gap:10px;margin-bottom:14px' }, [
@@ -45,9 +45,11 @@ export function render() {
   ]));
 
   // 预填缺失项
-  accounts.forEach((a) => { if (state.vals[a.id] == null) state.vals[a.id] = liveValuation(a, state.date).value; });
+  accounts.forEach((a) => { if (state.vals[a.id] == null) state.vals[a.id] = a.type === 'credit' ? num(a.availableCredit) : liveValuation(a, state.date).value; });
+  const valueFor = (a) => a.type === 'credit'
+    ? liveValuation({ ...a, availableCredit: num(state.vals[a.id]) }, state.date).value
+    : num(state.vals[a.id]);
 
-  let assets = 0, liab = 0;
   for (const type of ORDER) {
     const list = accounts.filter((a) => a.type === type);
     if (!list.length) continue;
@@ -56,7 +58,24 @@ export function render() {
     list.forEach((a) => {
       const lv = liveValuation(a, state.date);
       const auto = a.type === 'loan' || a.type === 'investment' || a.type === 'fixed';
-      if (lv.kind === 'liability') liab += num(state.vals[a.id]); else assets += num(state.vals[a.id]);
+      if (a.type === 'credit') {
+        const inputId = `available-${a.id}`;
+        const debtHint = h('div', { class: 'credit-debt', 'aria-live': 'polite', text: `当前欠款：${money(valueFor(a))}` });
+        rows.appendChild(h('div', { class: 'row reconcile-credit' }, [
+          accountBadge(a),
+          h('div', { class: 'row-main' }, [h('div', { class: 'row-title', text: a.name }), h('div', { class: 'row-sub', text: `总额度 ${money(num(a.totalLimit))}` })]),
+          h('div', { class: 'credit-entry' }, [
+            h('label', { for: inputId, text: '可用额度' }),
+            h('input', { id: inputId, type: 'text', inputmode: 'decimal', value: state.vals[a.id], oninput: (e) => {
+              state.vals[a.id] = e.target.value;
+              debtHint.textContent = `当前欠款：${money(valueFor(a))}`;
+              refreshSummary();
+            } }),
+            debtHint
+          ])
+        ]));
+        return;
+      }
       rows.appendChild(h('div', { class: 'row' }, [
         accountBadge(a),
         h('div', { class: 'row-main' }, [
@@ -65,20 +84,33 @@ export function render() {
         ]),
         h('input', {
           type: 'text', inputmode: 'decimal', value: state.vals[a.id],
+          'aria-label': `${a.name} · ${lv.kind === 'liability' ? '欠款' : '余额或估值'}`,
           style: 'width:118px;text-align:right;font-family:var(--num);padding:8px 10px',
-          oninput: (e) => { state.vals[a.id] = e.target.value; }
+          oninput: (e) => { state.vals[a.id] = e.target.value; refreshSummary(); }
         })
       ]));
     });
     root.appendChild(rows);
   }
 
-  root.appendChild(h('div', { class: 'card', style: 'margin-top:14px;display:flex;justify-content:space-around;text-align:center' }, [
-    colStat('总资产', moneyShort(assets)), colStat('总负债', moneyShort(liab)), colStat('净资产', moneyShort(assets - liab), true)
-  ]));
+  const summary = h('div', { class: 'card reconcile-summary' }, [
+    colStat('总资产', ''), colStat('总负债', ''), colStat('净资产', '', true)
+  ]);
+  root.appendChild(summary);
+  refreshSummary();
   root.appendChild(h('button', { class: 'btn primary block', style: 'margin-top:16px', text: '✓ 提交对账', onclick: submit }));
 
   return root;
+
+  function refreshSummary() {
+    let assets = 0, liabilities = 0;
+    accounts.forEach((a) => {
+      if (a.type === 'credit' || a.type === 'loan') liabilities += valueFor(a);
+      else assets += valueFor(a);
+    });
+    const values = [assets, liabilities, assets - liabilities];
+    summary.querySelectorAll('.stat-value').forEach((el, i) => { el.textContent = moneyShort(values[i]); });
+  }
 
   function rerender() { const ev = new HashChangeEvent('hashchange'); window.dispatchEvent(ev); }
 
@@ -95,13 +127,20 @@ export function render() {
   }
 
   function submit() {
+    if (accounts.some((a) => a.type === 'credit' && (String(state.vals[a.id]).trim() === '' || !Number.isFinite(+state.vals[a.id])))) {
+      toast('请填写有效的信用卡可用额度'); return;
+    }
     const snaps = [];
     accounts.forEach((a) => {
       const lv = liveValuation(a, state.date);
-      const value = num(state.vals[a.id]);
+      const value = valueFor(a);
       if (a.type === 'cash') updateAccount(a.id, { currentBalance: value });
-      else if (a.type === 'credit') updateAccount(a.id, { availableCredit: Math.max(0, (+a.totalLimit || 0) - value) });
-      else if (a.type === 'fixed' && Math.abs(value - lv.value) > 0.01) updateAccount(a.id, { valuationOverride: value });
+      else if (a.type === 'credit') updateAccount(a.id, { availableCredit: num(state.vals[a.id]) });
+      else if (a.type === 'fixed' && Math.abs(value - lv.value) > 0.01) {
+        updateAccount(a.id, a.subKind === 'house' && num(a.area) > 0
+          ? { valuationUnitPrice: value / num(a.area), valuationOverride: null }
+          : { valuationOverride: value, valuationUnitPrice: null });
+      }
       // 投资类手动调整只记入当日快照，不改写账户（避免覆盖后续联网行情）
       snaps.push({ accountId: a.id, date: state.date, value, kind: lv.kind, source: 'manual' });
     });

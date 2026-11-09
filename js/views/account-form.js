@@ -1,7 +1,7 @@
 // js/views/account-form.js —— 新增/编辑账户（五类）+ 还款计划 + 利率变更 + 提前还款
-import { h, clear, openSheet, confirmDialog, toast, num, today, money, moneyShort } from '../util.js';
+import { h, clear, openSheet, confirmDialog, toast, num, today, money, moneyShort, uid } from '../util.js';
 import { addAccount, updateAccount, deleteAccount } from '../store.js';
-import { TYPES, CASH_SUBKINDS, defaultLiquid, liveValuation } from '../models.js';
+import { TYPES, CASH_SUBKINDS, defaultLiquid, liveValuation, carMonthlyRate } from '../models.js';
 import { INSTITUTIONS, instBadge, banksGrouped, BANKS, localeDefaultRegion, icon } from '../icons.js';
 import { METHODS, DAYCOUNTS, generateSchedule, summarize } from '../loan.js';
 import { fetchQuote } from '../valuation.js';
@@ -12,7 +12,7 @@ function defaults(type) {
   const map = {
     cash: { subKind: 'bank', institutionId: '', currentBalance: '' },
     credit: { institutionId: '', totalLimit: '', availableCredit: '' },
-    fixed: { subKind: 'house', initialValue: '', unitPrice: '', area: '', depreciationRate: '', purchaseDate: today(), valuationOverride: '' },
+    fixed: { subKind: 'house', initialValue: '', unitPrice: '', area: '', valuationUnitPrice: '', monthlyDepreciationRate: '', purchaseDate: today(), valuationOverride: '' },
     investment: { subKind: 'stock', code: '', market: '', holdingQty: '', latestPrice: '', costTotal: '' },
     loan: { institutionId: '', principal: '', initialAnnualRate: '', periods: '', disbursementDate: today(), firstPaymentDate: '', repaymentMethod: 'equal_payment', dayCount: '30E/360', rateChanges: [], prepayments: [] }
   };
@@ -26,7 +26,18 @@ function toDraft(acc) {
     if (d.initialAnnualRate !== '' && d.initialAnnualRate != null) d.initialAnnualRate = round4(d.initialAnnualRate * 100);
     (d.rateChanges || []).forEach((r) => r.newAnnualRate = round4(r.newAnnualRate * 100));
   }
-  if (d.type === 'fixed' && d.depreciationRate) d.depreciationRate = round4(d.depreciationRate * 100);
+  if (d.type === 'fixed') {
+    d.valuationOverride ??= '';
+    d.valuationUnitPrice ??= '';
+    if (d.subKind === 'house' && d.valuationUnitPrice === '' && d.valuationOverride !== '' && num(d.area) > 0) {
+      d.valuationUnitPrice = num(d.valuationOverride) / num(d.area);
+      d.valuationOverride = '';
+    }
+    if (d.subKind === 'car') {
+      d._originalMonthlyRate = carMonthlyRate(d);
+      d.monthlyDepreciationRate = round4(d._originalMonthlyRate * 100);
+    }
+  }
   return d;
 }
 const round4 = (n) => Math.round(n * 10000) / 10000;
@@ -44,9 +55,19 @@ function clean(d) {
   } else if (d.type === 'credit') {
     o.institutionId = d.institutionId; o.totalLimit = num(d.totalLimit); o.availableCredit = num(d.availableCredit);
   } else if (d.type === 'fixed') {
-    o.subKind = d.subKind; o.initialValue = num(d.initialValue); o.valuationOverride = d.valuationOverride === '' ? null : num(d.valuationOverride);
-    if (d.subKind === 'house') { o.unitPrice = num(d.unitPrice); o.area = num(d.area); }
-    if (d.subKind === 'car') { o.depreciationRate = num(d.depreciationRate) / 100; o.purchaseDate = d.purchaseDate; }
+    o.subKind = d.subKind; o.initialValue = num(d.initialValue);
+    o.valuationOverride = d.valuationOverride == null || d.valuationOverride === '' ? null : num(d.valuationOverride);
+    o.valuationUnitPrice = null;
+    if (d.subKind === 'house') {
+      o.unitPrice = num(d.unitPrice); o.area = num(d.area);
+      o.valuationUnitPrice = d.valuationUnitPrice == null || d.valuationUnitPrice === '' ? null : num(d.valuationUnitPrice);
+      if (o.valuationUnitPrice != null) o.valuationOverride = null;
+    }
+    if (d.subKind === 'car') {
+      o.monthlyDepreciationRate = d._originalMonthlyRate != null && num(d.monthlyDepreciationRate) === round4(d._originalMonthlyRate * 100)
+        ? d._originalMonthlyRate : num(d.monthlyDepreciationRate) / 100;
+      o.depreciationRate = null; o.purchaseDate = d.purchaseDate;
+    }
   } else if (d.type === 'investment') {
     o.subKind = d.subKind; o.code = (d.code || '').trim(); o.market = d.market || '';
     o.holdingQty = num(d.holdingQty); o.latestPrice = num(d.latestPrice); o.costTotal = num(d.costTotal);
@@ -66,18 +87,24 @@ function clean(d) {
 
 /* ---------- 字段构件 ---------- */
 function fInput(label, d, key, { type = 'text', ph = '', hint = '', suffix = '' } = {}) {
+  const id = uid();
   const input = h('input', {
+    id,
     type: type === 'number' ? 'text' : type, inputmode: type === 'number' ? 'decimal' : (type === 'date' ? null : null),
     value: d[key] ?? '', placeholder: ph, oninput: (e) => { d[key] = e.target.value; }
   });
   const inner = suffix
-    ? h('div', { style: 'position:relative' }, [input, h('span', { style: 'position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:14px', text: suffix })])
+    ? h('div', { class: 'input-unit' }, [input, h('span', { text: suffix })])
     : input;
-  return h('div', { class: 'field' }, [h('label', { text: label }), inner, hint ? h('div', { class: 'hint', text: hint }) : null]);
+  return h('div', { class: 'field' }, [h('label', { for: id, text: label }), inner, hint ? h('div', { class: 'hint', text: hint }) : null]);
 }
 function fSeg(label, d, key, opts, onchange) {
   const seg = h('div', { class: 'seg' });
-  opts.forEach((o) => seg.appendChild(h('button', { class: d[key] === o.v ? 'active' : '', text: o.label, onclick: () => { d[key] = o.v; onchange && onchange(); } })));
+  opts.forEach((o) => seg.appendChild(h('button', { class: d[key] === o.v ? 'active' : '', text: o.label, onclick: (e) => {
+    d[key] = o.v;
+    [...seg.children].forEach((b) => b.classList.toggle('active', b === e.currentTarget));
+    onchange && onchange();
+  } })));
   return h('div', { class: 'field' }, [h('label', { text: label }), seg]);
 }
 const PICK_CHEV = '<svg viewBox="0 0 24 24" style="width:8px;height:14px"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -159,24 +186,49 @@ function buildBody(d, rebuild) {
   } else if (d.type === 'fixed') {
     frag.appendChild(fSeg('资产类型', d, 'subKind', [{ v: 'house', label: '房产' }, { v: 'car', label: '车辆' }, { v: 'other', label: '其他' }], rebuild));
     frag.appendChild(fInput('名称', d, 'name', { ph: d.subKind === 'house' ? '如：自住房' : d.subKind === 'car' ? '如：家用车' : '资产名称' }));
+    const valuationFields = h('div');
+    const valuationHint = h('div', { class: 'hint valuation-preview', 'aria-live': 'polite' });
+    const refreshValuation = () => {
+      valuationHint.textContent = `当前估值：${money(liveValuation(clean(d)).value)}`;
+    };
     if (d.subKind === 'house') {
-      frag.appendChild(h('div', { class: 'field row2' }, [
-        fInput('单价', d, 'unitPrice', { type: 'number', suffix: '元/㎡' }),
+      valuationFields.appendChild(h('div', { class: 'field row2' }, [
+        fInput('参考单价', d, 'unitPrice', { type: 'number', suffix: '元/㎡' }),
         fInput('面积', d, 'area', { type: 'number', suffix: '㎡' })
       ]));
-      frag.appendChild(fInput('初始价值', d, 'initialValue', { type: 'number', suffix: '元', hint: '未填单价×面积时用作估值基准' }));
+      valuationFields.appendChild(fInput('初始价值', d, 'initialValue', { type: 'number', suffix: '元', hint: '未填单价×面积时用作估值基准' }));
+      valuationFields.appendChild(fInput('手动估值单价（可选）', d, 'valuationUnitPrice', { type: 'number', suffix: '元/㎡', hint: '当前估值 = 手动单价 × 面积；留空使用参考单价' }));
+      if (d.valuationOverride !== '' && d.valuationOverride != null) {
+        valuationFields.appendChild(h('div', { class: 'hint', text: `原手动总估值 ${money(num(d.valuationOverride))} 已保留，填写面积和手动单价后替换。` }));
+      }
     } else if (d.subKind === 'car') {
-      frag.appendChild(fInput('购入价值', d, 'initialValue', { type: 'number', suffix: '元' }));
-      frag.appendChild(h('div', { class: 'field row2' }, [
+      valuationFields.appendChild(fInput('购入价值', d, 'initialValue', { type: 'number', suffix: '元' }));
+      valuationFields.appendChild(h('div', { class: 'field row2' }, [
         fInput('购入日期', d, 'purchaseDate', { type: 'date' }),
-        fInput('年折损率', d, 'depreciationRate', { type: 'number', suffix: '%', ph: '如 15' })
+        fInput('月折损率', d, 'monthlyDepreciationRate', { type: 'number', suffix: '%', ph: '如 1' })
       ]));
     } else {
-      frag.appendChild(fInput('初始价值', d, 'initialValue', { type: 'number', suffix: '元' }));
+      valuationFields.appendChild(fInput('初始价值', d, 'initialValue', { type: 'number', suffix: '元' }));
     }
-    frag.appendChild(fInput('手动估值（可选）', d, 'valuationOverride', { type: 'number', suffix: '元', hint: '填写后优先于自动估值' }));
-    const v = liveValuation(clean({ ...d, _liquid: undefined })).value;
-    frag.appendChild(h('div', { class: 'hint', style: 'margin:-6px 2px 10px', html: `当前估值：<b>${money(v)}</b>` }));
+    if (d.subKind !== 'house') {
+      const overrideField = fInput('手动估值（可选）', d, 'valuationOverride', { type: 'number', suffix: '元', hint: '填写后优先于自动估值；留空恢复自动估值' });
+      valuationFields.appendChild(overrideField);
+      if (d.subKind === 'car') {
+        valuationFields.appendChild(h('button', { class: 'btn block', text: '按月折损率计算当前估值', onclick: () => {
+          if (!d.purchaseDate || num(d.initialValue) <= 0) { toast('请先填写购入价值和日期'); return; }
+          if (!Number.isFinite(+d.monthlyDepreciationRate) || num(d.monthlyDepreciationRate) < 0 || num(d.monthlyDepreciationRate) > 100) { toast('月折损率应为 0%～100%'); return; }
+          d.valuationOverride = liveValuation({ ...clean(d), valuationOverride: null }).value;
+          overrideField.querySelector('input').value = d.valuationOverride;
+          refreshValuation();
+          toast('已按月折损率计算当前估值');
+        } }));
+        valuationFields.appendChild(h('div', { class: 'hint', style: 'margin:6px 0 12px', text: '以购入价值复利折旧，按天折算月数。' }));
+      }
+    }
+    valuationFields.addEventListener('input', refreshValuation);
+    refreshValuation();
+    frag.appendChild(valuationFields);
+    frag.appendChild(valuationHint);
   } else if (d.type === 'investment') {
     frag.appendChild(fSeg('类型', d, 'subKind', [{ v: 'stock', label: '股票' }, { v: 'fund', label: '基金' }], rebuild));
     frag.appendChild(fInput('名称', d, 'name', { ph: d.subKind === 'fund' ? '如：沪深300ETF' : '如：贵州茅台' }));
@@ -255,7 +307,7 @@ function listEditor(title, arr, fmtItem, onAdd, onDel) {
 
 function rateChangeForm(d, rebuild) {
   const t = { effectiveDate: today(), newAnnualRate: '' };
-  const body = h('div', {}, [
+  const body = h('div', { class: 'inline-fields' }, [
     fInput('生效日期', t, 'effectiveDate', { type: 'date' }),
     fInput('新年利率', t, 'newAnnualRate', { type: 'number', suffix: '%' })
   ]);
@@ -264,7 +316,7 @@ function rateChangeForm(d, rebuild) {
 }
 function prepayForm(d, rebuild) {
   const t = { date: today(), amount: '', mode: 'shorten' };
-  const body = h('div', {}, [
+  const body = h('div', { class: 'inline-fields' }, [
     fInput('还款日期', t, 'date', { type: 'date' }),
     fInput('提前还款金额', t, 'amount', { type: 'number', suffix: '元' }),
     fSeg('方式', t, 'mode', [{ v: 'shorten', label: '缩短期限' }, { v: 'reduce', label: '减少月供' }])
@@ -334,6 +386,8 @@ export function openAccountForm(existing, presetType) {
     d.liquid = d._liquid === 'yes' ? true : d._liquid === 'no' ? false : undefined;
     const rec = clean(d);
     if (!rec.name) { toast('请填写名称'); return; }
+    if (rec.type === 'fixed' && rec.subKind === 'house' && rec.valuationUnitPrice != null && (rec.area <= 0 || rec.valuationUnitPrice < 0)) { toast('请填写有效的面积和估值单价'); return; }
+    if (rec.type === 'fixed' && rec.subKind === 'car' && (!Number.isFinite(+d.monthlyDepreciationRate) || num(d.monthlyDepreciationRate) < 0 || num(d.monthlyDepreciationRate) > 100)) { toast('月折损率应为 0%～100%'); return; }
     if (rec.type === 'loan' && (!rec.principal || !rec.periods || !rec.firstPaymentDate)) { toast('请完整填写贷款信息'); return; }
     if (existing) updateAccount(existing.id, rec); else addAccount(rec);
     toast(existing ? '已保存' : '已添加');

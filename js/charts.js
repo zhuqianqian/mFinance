@@ -11,28 +11,44 @@ function cssVar(name) { return getComputedStyle(document.documentElement).getPro
 export function catColor(i) { return cssVar(`--cat-${(i % 8) + 1}`); }
 
 /* ---------- 趋势折线（单系列，含十字光标 tooltip） ---------- */
-export function lineChart(points, { height = 190, fmt = moneyShort } = {}) {
+export function lineChart(points, { height = 190, fmt = moneyShort, percent = false, color = null } = {}) {
   const wrap = h('div', { style: 'position:relative;width:100%;touch-action:pan-y;' });
   if (!points.length) return wrap;
 
-  const W = 340, H = height, padL = 10, padR = 10, padT = 14, padB = 22;
-  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, preserveAspectRatio: 'none', style: 'overflow:visible;display:block' });
-
-  const xs = points.map((_, i) => points.length === 1 ? W / 2 : padL + (i * (W - padL - padR)) / (points.length - 1));
+  const W = 340, H = height, padR = 10, padT = 14, padB = 25;
   const vals = points.map((p) => p.value);
   let min = Math.min(...vals), max = Math.max(...vals);
-  if (min === max) { min -= 1; max += 1; }
-  const pad = (max - min) * 0.12; min -= pad; max += pad;
+  if (min === max) { const spread = Math.abs(min) * 0.1 || (percent ? 0.01 : 1); min -= spread; max += spread; }
+  const roughStep = (max - min) / 3;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+  const step = [1, 2, 2.5, 5, 10].find((n) => n * magnitude >= roughStep) * magnitude;
+  min = Math.floor(min / step) * step; max = Math.ceil(max / step) * step;
+  const largest = Math.max(Math.abs(min), Math.abs(max));
+  const unit = percent ? 0.01 : largest >= 1e8 ? 1e8 : largest >= 1e4 ? 1e4 : 1;
+  const unitLabel = percent ? '%' : unit === 1e8 ? '亿' : unit === 1e4 ? '万' : '';
+  let decimals = 0;
+  while (decimals < 8 && Math.abs(step / unit * 10 ** decimals - Math.round(step / unit * 10 ** decimals)) > 1e-6) decimals++;
+  const ticks = Array.from({ length: Math.round((max - min) / step) + 1 }, (_, i) => {
+    const value = min + i * step;
+    const scaled = Math.abs(value) < step * 1e-8 ? 0 : value / unit;
+    return { value, label: `${percent ? '' : '¥'}${scaled.toFixed(decimals)}${unitLabel}` };
+  });
+  const padL = Math.max(44, ...ticks.map((t) => t.label.length * 7 + 12));
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, preserveAspectRatio: 'none', style: 'display:block', role: 'img', 'aria-label': percent ? '负债率趋势图' : '金额趋势图' });
+  const xs = points.map((_, i) => points.length === 1 ? (padL + W - padR) / 2 : padL + (i * (W - padL - padR)) / (points.length - 1));
   const yOf = (v) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
 
-  // 网格（3 条，弱）
+  // 纵坐标刻度与网格，金额 / 百分比共用同一比例尺。
   const grid = cssVar('--chart-grid');
-  for (let g = 0; g <= 2; g++) {
-    const y = padT + (g * (H - padT - padB)) / 2;
+  for (const tick of ticks) {
+    const y = yOf(tick.value);
     svg.appendChild(svgEl('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: grid, 'stroke-width': 1 }));
+    const label = svgEl('text', { x: padL - 8, y, 'text-anchor': 'end', 'dominant-baseline': 'middle', fill: cssVar('--text-3'), 'font-size': 12, class: 'chart-y-label' });
+    label.textContent = tick.label; svg.appendChild(label);
   }
+  svg.appendChild(svgEl('line', { x1: padL, y1: padT, x2: padL, y2: H - padB, stroke: grid, 'stroke-width': 1 }));
 
-  const accent = cssVar('--accent');
+  const accent = color || cssVar('--accent');
   // 面积
   const area = `M${xs[0]},${yOf(vals[0])} ` + xs.map((x, i) => `L${x},${yOf(vals[i])}`).join(' ') +
     ` L${xs[xs.length - 1]},${H - padB} L${xs[0]},${H - padB} Z`;
@@ -58,12 +74,11 @@ export function lineChart(points, { height = 190, fmt = moneyShort } = {}) {
   const tip = h('div', { style: 'position:absolute;pointer-events:none;background:var(--card);border:0.5px solid var(--separator);box-shadow:var(--shadow-pop);border-radius:10px;padding:6px 10px;font-size:12px;opacity:0;transition:opacity .1s;white-space:nowrap;z-index:5;' });
   wrap.appendChild(tip);
 
-  // x 轴端点标签
-  const xlab = h('div', { style: 'display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:2px;' }, [
-    h('span', { text: points[0].date.slice(2) }),
-    points.length > 2 ? h('span', { text: points[points.length - 1].date.slice(2) }) : null
-  ]);
-  wrap.appendChild(xlab);
+  // x 轴端点标签跟随绘图区，单个快照居中。
+  [0, ...(points.length > 1 ? [points.length - 1] : [])].forEach((i) => {
+    const label = svgEl('text', { x: xs[i], y: H - 3, 'text-anchor': points.length === 1 ? 'middle' : i === 0 ? 'start' : 'end', fill: cssVar('--text-3'), 'font-size': 11 });
+    label.textContent = points[i].date.slice(2); svg.appendChild(label);
+  });
 
   function move(clientX) {
     const rect = svg.getBoundingClientRect();
@@ -75,9 +90,8 @@ export function lineChart(points, { height = 190, fmt = moneyShort } = {}) {
     dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('opacity', 1);
     tip.style.opacity = '1';
     tip.innerHTML = `<b style="font-size:13px;">${fmt(vals[idx])}</b><br><span style="color:var(--text-3)">${points[idx].date}</span>`;
-    const leftPct = (x / W) * 100;
-    tip.style.left = `calc(${leftPct}% )`;
-    tip.style.transform = `translateX(${leftPct > 60 ? '-100%' : '-50%'})`;
+    const left = (x / W) * rect.width - tip.offsetWidth / 2;
+    tip.style.left = `${Math.max(0, Math.min(left, rect.width - tip.offsetWidth))}px`;
     tip.style.top = '0px';
   }
   function end() { cursor.setAttribute('opacity', 0); dot.setAttribute('opacity', 0); tip.style.opacity = '0'; }
@@ -88,10 +102,10 @@ export function lineChart(points, { height = 190, fmt = moneyShort } = {}) {
 }
 
 /* ---------- 资产构成环形（分类色、直接标签 + 图例、2px 间隙） ---------- */
-export function donutChart(items, { centerLabel = '总资产', total = null } = {}) {
+export function donutChart(items, { centerLabel = '总资产', total = null, emptyLabel = '暂无资产数据' } = {}) {
   const sum = total != null ? total : items.reduce((a, b) => a + b.value, 0);
-  const wrap = h('div', { style: 'display:flex;gap:16px;align-items:center;flex-wrap:wrap;' });
-  if (sum <= 0 || !items.length) { wrap.appendChild(h('div', { class: 'muted', text: '暂无资产数据' })); return wrap; }
+  const wrap = h('div', { class: 'donut-chart' });
+  if (sum <= 0 || !items.length) { wrap.appendChild(h('div', { class: 'muted', text: emptyLabel })); return wrap; }
 
   const size = 150, r = 62, cx = size / 2, cy = size / 2, sw = 22;
   const svg = svgEl('svg', { viewBox: `0 0 ${size} ${size}`, width: 150, height: 150, style: 'flex-shrink:0' });
@@ -121,7 +135,7 @@ export function donutChart(items, { centerLabel = '总资产', total = null } = 
   const ring = h('div', { style: 'position:relative;width:150px;height:150px;flex-shrink:0;' }, [svg, center]);
 
   // 图例（色点 + 名称 + 金额 + 占比）—— 文字用文本色，身份靠色点
-  const legend = h('div', { style: 'flex:1;min-width:150px;display:flex;flex-direction:column;gap:7px;' });
+  const legend = h('div', { class: 'donut-legend' });
   items.forEach((it) => {
     legend.appendChild(h('div', { style: 'display:flex;align-items:center;gap:8px;font-size:13px;' }, [
       h('span', { style: `width:10px;height:10px;border-radius:3px;background:${it.color};flex-shrink:0;` }),

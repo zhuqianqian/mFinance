@@ -23,15 +23,15 @@
   --purple: #af52de;
   --teal: #30b0c7;
 
-  /* 图表分类色（dataviz 参考板，已过校验：亮/暗各自取步） */
-  --cat-1: #2a78d6;
-  --cat-2: #eb6834;
-  --cat-3: #1baf7a;
-  --cat-4: #eda100;
-  --cat-5: #e87ba4;
-  --cat-6: #008300;
-  --cat-7: #6250d6;
-  --cat-8: #e34948;
+  /* 资产用翠绿、青绿、黄绿区分；负债用珊瑚红、玫红区分。 */
+  --cat-1: #168a64;
+  --cat-2: #27a8a4;
+  --cat-3: #9dbd48;
+  --cat-4: #8c9e90;
+  --cat-5: #ef806d;
+  --cat-6: #ce466b;
+  --cat-7: #e5a553;
+  --cat-8: #8e78bf;
   --chart-surface: #fcfcfb;
   --chart-grid: rgba(60,60,67,0.10);
 
@@ -65,8 +65,8 @@
     --accent: #2fb8a0;
     --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
     --shadow-pop: 0 10px 40px rgba(0,0,0,0.6);
-    --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
-    --cat-5:#d55181; --cat-6:#008300; --cat-7:#9085e9; --cat-8:#e66767;
+    --cat-1:#39c995; --cat-2:#50c4c2; --cat-3:#b5d569; --cat-4:#a6b6aa;
+    --cat-5:#ff9985; --cat-6:#ed7399; --cat-7:#f3ba6d; --cat-8:#b19bdd;
     --chart-surface:#1a1a19; --chart-grid:rgba(235,235,245,0.12);
   }
 }
@@ -79,8 +79,8 @@ html[data-theme="dark"] {
   --text:#fff; --text-2:#ebebf5; --text-3:rgba(235,235,245,.6); --text-4:rgba(235,235,245,.3);
   --shadow-card:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.4);
   --accent:#2fb8a0;
-  --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
-  --cat-5:#d55181; --cat-6:#008300; --cat-7:#9085e9; --cat-8:#e66767;
+  --cat-1:#39c995; --cat-2:#50c4c2; --cat-3:#b5d569; --cat-4:#a6b6aa;
+  --cat-5:#ff9985; --cat-6:#ed7399; --cat-7:#f3ba6d; --cat-8:#b19bdd;
   --chart-surface:#1a1a19; --chart-grid:rgba(235,235,245,0.12);
 }
 html[data-theme="light"] {
@@ -88,8 +88,8 @@ html[data-theme="light"] {
   --separator:rgba(60,60,67,.12); --separator-strong:rgba(60,60,67,.22);
   --text:#1c1c1e; --text-2:#3c3c43; --text-3:rgba(60,60,67,.6); --text-4:rgba(60,60,67,.3);
   --accent:#0b8873;
-  --cat-1:#2a78d6; --cat-2:#eb6834; --cat-3:#1baf7a; --cat-4:#eda100;
-  --cat-5:#e87ba4; --cat-6:#008300; --cat-7:#6250d6; --cat-8:#e34948;
+  --cat-1:#168a64; --cat-2:#27a8a4; --cat-3:#9dbd48; --cat-4:#8c9e90;
+  --cat-5:#ef806d; --cat-6:#ce466b; --cat-7:#e5a553; --cat-8:#8e78bf;
   --chart-surface:#fcfcfb; --chart-grid:rgba(60,60,67,0.10);
 }
 
@@ -217,15 +217,38 @@ a { color: var(--accent); text-decoration: none; }
 .icon-btn svg { width: 20px; height: 20px; }
 
 /* ---------- 表单 ---------- */
-.field { margin-bottom: 14px; }
+.field { margin-bottom: 14px; min-width: 0; }
 .field > label { display: block; font-size: 13px; color: var(--text-3); font-weight: 600; margin-bottom: 6px; padding-left: 2px; }
 .field input, .field select, .field textarea {
-  width: 100%; padding: 12px 14px; border-radius: 12px; border: 0.5px solid var(--separator);
+  width: 100%; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 0.5px solid var(--separator);
   background: var(--card); font-size: 16px; outline: none; transition: border-color .15s;
 }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+.hint { font-size: 12px; color: var(--text-3); line-height: 1.5; }
 .field .hint { font-size: 12px; color: var(--text-3); margin-top: 5px; padding-left: 2px; }
-.field.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field input, .field select { height: 46px; line-height: 20px; }
+.field.row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.field.row2 > .field { margin-bottom: 0; }
+input[type="date"] { min-width: 0; max-width: 100%; height: 46px; padding: 10px; appearance: none; -webkit-appearance: none; }
+input[type="date"]::-webkit-date-and-time-value { min-height: 20px; text-align: left; }
+input[type="date"]::-webkit-datetime-edit { min-width: 0; padding: 0; }
+.input-unit { display: flex; align-items: center; min-width: 0; height: 46px; border: 0.5px solid var(--separator); border-radius: 12px; background: var(--card); }
+.input-unit:focus-within { border-color: var(--accent); }
+.field .input-unit input { flex: 1; min-width: 0; width: 0; height: 44px; border: 0; background: transparent; padding-right: 4px; }
+.input-unit > span { flex-shrink: 0; padding-right: 12px; color: var(--text-3); font-size: 13px; white-space: nowrap; }
+.inline-fields > .field { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 10px; }
+.inline-fields > .field > label { margin: 0; padding: 0; }
+.inline-fields .seg button { min-width: 0; padding: 10px 4px; font-size: 12px; }
+.valuation-preview { padding: 12px; margin: 0 0 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--card)); color: var(--accent); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.reconcile-date { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 155px); align-items: center; gap: 10px; }
+.reconcile-date input, .credit-entry input { width: 100%; min-width: 0; border: 0.5px solid var(--separator); border-radius: 10px; background: var(--card); font-size: 16px; }
+.reconcile-credit { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 8px 12px; }
+.reconcile-credit .row-sub { white-space: normal; overflow-wrap: anywhere; }
+.credit-entry { grid-column: 2; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.credit-entry label, .credit-debt { font-size: 12px; color: var(--text-3); }
+.credit-entry input { padding: 8px; text-align: right; font-family: var(--num); }
+.credit-debt { grid-column: 1 / -1; text-align: right; overflow-wrap: anywhere; }
+.reconcile-summary { display: flex; flex-wrap: wrap; justify-content: space-around; text-align: center; gap: 14px; margin-top: 14px; }
 .seg { display:flex; background: var(--card-2); border-radius: 12px; padding: 3px; gap: 3px; }
 .seg button { flex:1; padding: 9px 6px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--text-2); }
 .seg button.active { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
@@ -346,17 +369,18 @@ svg.chevron { width:7px; height:12px; }
 /* ============================================================
    设计刷新（参考 Codex 版本）：净资产卡 / 指标面板 / 图表 / 还款时间线
    ============================================================ */
-/* 净资产大卡：主题色背景 */
+/* 净资产大卡：单独保留图标蓝，不影响其他区域的主题 / 语义色。 */
 .hero {
-  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 68%, #06362e));
-  color: #fff; border-radius: var(--radius-l); padding: 22px 24px; margin-bottom: 16px;
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 30%, transparent);
+  --hero-accent: #0a84ff;
+  background: linear-gradient(140deg, var(--hero-accent), color-mix(in srgb, var(--hero-accent) 68%, #123a88));
+  color: #fff; border-radius: var(--radius-l); padding: 20px; margin-bottom: 16px; container-type: inline-size;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--hero-accent) 30%, transparent);
 }
-.hero-label { display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#ffffffcf; font-weight:500; }
+.hero-label { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; font-size:12px; color:#ffffffcf; font-weight:500; }
 .hero-label .hero-date { font-size:11px; color:#ffffff9e; }
-.hero-value { font-family:var(--num); font-size:38px; font-weight:750; letter-spacing:-0.03em; margin:14px 0 0; font-variant-numeric:tabular-nums; white-space:nowrap; line-height:1.1; }
-.hero-value .cur { font-size:23px; font-weight:400; opacity:.72; margin-right:3px; letter-spacing:-0.01em; }
-.hero-cmp { display:flex; gap:28px; margin-top:22px; flex-wrap:wrap; }
+.hero-value { font-family:var(--num); font-size:clamp(18px, 7vw, 32px); font-size:min(32px, calc(160cqw / var(--amount-length, 12))); font-weight:750; letter-spacing:-0.03em; margin:14px 0 0; font-variant-numeric:tabular-nums; white-space:nowrap; line-height:1.1; }
+.hero-value .cur { font-size:.65em; font-weight:400; opacity:.72; margin-right:3px; letter-spacing:-0.01em; }
+.hero-cmp { display:flex; gap:8px 20px; margin-top:18px; flex-wrap:wrap; }
 .hero-cmp .cmp { font-size:11px; color:#ffffffcf; display:flex; align-items:baseline; gap:6px; }
 .hero-cmp .cmp b { font-family:var(--num); font-variant-numeric:tabular-nums; font-weight:600; font-size:13px; }
 .hero .delta-up { color:#d8f6ec; }
@@ -364,19 +388,22 @@ svg.chevron { width:7px; height:12px; }
 .hero-cmp .pct { font-size:10px; background:#ffffff1f; padding:2px 5px; border-radius:4px; margin-left:2px; }
 
 /* 指标面板：2×2，分隔线 */
-.metrics-panel { background:var(--card); border-radius:var(--radius-l); box-shadow:var(--shadow-card); display:grid; grid-template-columns:1fr 1fr; overflow:hidden; margin-bottom:16px; }
-.metric-box { padding:15px 17px; display:flex; flex-direction:column; justify-content:center; }
+.metrics-panel { background:var(--card); border-radius:var(--radius-l); box-shadow:var(--shadow-card); display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); margin-bottom:16px; }
+.metric-box { padding:14px 12px; min-width:0; container-type:inline-size; display:flex; flex-direction:column; justify-content:center; }
 .metric-box:nth-child(-n+2) { border-bottom:0.5px solid var(--separator); }
 .metric-box:nth-child(odd) { border-right:0.5px solid var(--separator); }
 .metric-box .metric-label { font-size:12px; color:var(--text-3); display:flex; align-items:center; gap:6px; }
 .metric-box .metric-label .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
-.metric-box .metric-val { font-family:var(--num); font-size:22px; font-weight:650; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; margin-top:10px; }
+.metric-status { font-size:10px; font-weight:600; white-space:nowrap; }
+.metric-box .metric-val { font-family:var(--num); font-size:16px; font-size:min(18px, calc(160cqw / var(--amount-length, 12))); font-weight:650; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; margin-top:8px; white-space:nowrap; }
 .metric-box .metric-val.neg { color:var(--negative); }
 
 /* 图表卡工具条 */
 .chart-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
 .chart-head .seg { background:var(--card-2); }
 .range-sel { font-size:12px; min-height:30px; padding:5px 10px; border-radius:8px; border:0.5px solid var(--separator); background:var(--card-2); color:var(--text-2); width:auto; }
+.donut-chart { display:flex; gap:16px; align-items:center; justify-content:center; flex-wrap:wrap; }
+.donut-legend { flex:1 1 220px; min-width:0; display:flex; flex-direction:column; gap:9px; }
 
 /* ---------- 还款时间线（线从卡片内部穿过） ---------- */
 .sch-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:2px; }
