@@ -1,5 +1,6 @@
 // js/views/reconcile.js —— 对账：校准各账户当日余额并生成快照
 import { h, money, moneyShort, num, fmtDate, toast } from '../util.js';
+import { inputField } from '../forms.js';
 import { getAccounts, getSettings, putSnapshotsBatch, updateAccount, updateSettings } from '../store.js';
 import { TYPES, liveValuation } from '../models.js';
 import { accountBadge, icon } from '../icons.js';
@@ -34,13 +35,11 @@ export function render() {
   }
 
   root.appendChild(h('div', { class: 'card reconcile-date' }, [
-    h('div', {}, [h('div', { class: 'stat-label', text: '对账日期' }),
-      h('div', { class: 'muted', style: 'font-size:12px;margin-top:2px', text: `设定对账日：每月 ${getSettings().reconcileDay} 日` })]),
-    h('input', { type: 'date', 'aria-label': '对账日期', value: state.date, onchange: (e) => { if (!e.target.value) return; state.date = e.target.value; state.vals = {}; rerender(); } })
+    inputField('对账日期', { type: 'date', value: state.date, hint: `每月 ${getSettings().reconcileDay} 日对账`, onchange: (e) => { if (!e.target.value) return; state.date = e.target.value; state.vals = {}; rerender(); } })
   ]));
 
-  root.appendChild(h('div', { style: 'display:flex;gap:10px;margin-bottom:14px' }, [
-    h('button', { class: 'btn block', style: 'display:flex', html: icon('refresh') + '<span style="margin-left:6px">联网更新行情</span>', onclick: onQuote }),
+  root.appendChild(h('div', { class: 'reconcile-actions' }, [
+    h('button', { class: 'btn block', html: icon('refresh') + '<span>联网更新行情</span>', onclick: onQuote }),
     h('button', { class: 'btn block', text: '↻ 重新估值', onclick: () => { state.vals = {}; rerender(); } })
   ]));
 
@@ -54,40 +53,36 @@ export function render() {
     const list = accounts.filter((a) => a.type === type);
     if (!list.length) continue;
     root.appendChild(h('div', { class: 'section-label', text: TYPES[type].label }));
-    const rows = h('div', { class: 'rows' });
+    const rows = h('div', { class: 'rows reconcile-rows' });
     list.forEach((a) => {
       const lv = liveValuation(a, state.date);
       const auto = a.type === 'loan' || a.type === 'investment' || a.type === 'fixed';
-      if (a.type === 'credit') {
-        const inputId = `available-${a.id}`;
-        const debtHint = h('div', { class: 'credit-debt', 'aria-live': 'polite', text: `当前欠款：${money(valueFor(a))}` });
-        rows.appendChild(h('div', { class: 'row reconcile-credit' }, [
-          accountBadge(a),
-          h('div', { class: 'row-main' }, [h('div', { class: 'row-title', text: a.name }), h('div', { class: 'row-sub', text: `总额度 ${money(num(a.totalLimit))}` })]),
-          h('div', { class: 'credit-entry' }, [
-            h('label', { for: inputId, text: '可用额度' }),
-            h('input', { id: inputId, type: 'text', inputmode: 'decimal', value: state.vals[a.id], oninput: (e) => {
-              state.vals[a.id] = e.target.value;
-              debtHint.textContent = `当前欠款：${money(valueFor(a))}`;
-              refreshSummary();
-            } }),
-            debtHint
-          ])
-        ]));
-        return;
-      }
+      const credit = a.type === 'credit';
+      const quotaAmount = (value) => moneyShort(value).replace('¥', '').replace('.00万', '万').replace('.00亿', '亿');
+      const sub = h('div', { class: 'row-sub', text: (lv.kind === 'liability' ? '欠款 · ' : '') + (auto ? '自动估值（可改）' : '手动校准') });
+      const updateQuota = () => {
+        sub.textContent = `额度：${quotaAmount(valueFor(a))} / ${quotaAmount(num(a.totalLimit))}`;
+        sub.title = `额度：${money(valueFor(a))} / ${money(num(a.totalLimit))}`;
+        sub.setAttribute('aria-label', `欠款 ${money(valueFor(a))}，总额度 ${money(num(a.totalLimit))}`);
+      };
+      if (credit) { sub.setAttribute('aria-live', 'polite'); updateQuota(); }
+      const label = credit ? '可用额度' : lv.kind === 'liability' ? '欠款' : auto ? '估值' : '余额';
+      const entry = inputField(label, {
+        type: 'number', value: state.vals[a.id], compact: true,
+        oninput: (e) => {
+          state.vals[a.id] = e.target.value;
+          if (credit) updateQuota();
+          refreshSummary();
+        }
+      });
+      entry.querySelector('input').setAttribute('aria-label', `${a.name} · ${label}`);
       rows.appendChild(h('div', { class: 'row' }, [
         accountBadge(a),
         h('div', { class: 'row-main' }, [
           h('div', { class: 'row-title', style: 'font-size:15px', text: a.name }),
-          h('div', { class: 'row-sub', text: (lv.kind === 'liability' ? '欠款 · ' : '') + (auto ? '自动估值（可改）' : '手动校准') })
+          sub
         ]),
-        h('input', {
-          type: 'text', inputmode: 'decimal', value: state.vals[a.id],
-          'aria-label': `${a.name} · ${lv.kind === 'liability' ? '欠款' : '余额或估值'}`,
-          style: 'width:118px;text-align:right;font-family:var(--num);padding:8px 10px',
-          oninput: (e) => { state.vals[a.id] = e.target.value; refreshSummary(); }
-        })
+        entry
       ]));
     });
     root.appendChild(rows);

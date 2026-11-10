@@ -1,5 +1,6 @@
 // js/views/account-form.js —— 新增/编辑账户（五类）+ 还款计划 + 利率变更 + 提前还款
-import { h, clear, openSheet, confirmDialog, toast, num, today, money, moneyShort, uid } from '../util.js';
+import { h, clear, openSheet, confirmDialog, toast, num, today, money, moneyShort } from '../util.js';
+import { inputField, fieldControl, segmentedField } from '../forms.js';
 import { addAccount, updateAccount, deleteAccount } from '../store.js';
 import { TYPES, CASH_SUBKINDS, defaultLiquid, liveValuation, carMonthlyRate } from '../models.js';
 import { INSTITUTIONS, instBadge, banksGrouped, BANKS, localeDefaultRegion, icon } from '../icons.js';
@@ -87,16 +88,10 @@ function clean(d) {
 
 /* ---------- 字段构件 ---------- */
 function fInput(label, d, key, { type = 'text', ph = '', hint = '', suffix = '' } = {}) {
-  const id = uid();
-  const input = h('input', {
-    id,
-    type: type === 'number' ? 'text' : type, inputmode: type === 'number' ? 'decimal' : (type === 'date' ? null : null),
-    value: d[key] ?? '', placeholder: ph, oninput: (e) => { d[key] = e.target.value; }
+  return inputField(label, {
+    type, value: d[key], placeholder: ph, hint, suffix,
+    oninput: (e) => { d[key] = e.target.value; }
   });
-  const inner = suffix
-    ? h('div', { class: 'input-unit' }, [input, h('span', { text: suffix })])
-    : input;
-  return h('div', { class: 'field' }, [h('label', { for: id, text: label }), inner, hint ? h('div', { class: 'hint', text: hint }) : null]);
 }
 function fSeg(label, d, key, opts, onchange) {
   const seg = h('div', { class: 'seg' });
@@ -105,7 +100,7 @@ function fSeg(label, d, key, opts, onchange) {
     [...seg.children].forEach((b) => b.classList.toggle('active', b === e.currentTarget));
     onchange && onchange();
   } })));
-  return h('div', { class: 'field' }, [h('label', { text: label }), seg]);
+  return segmentedField(label, seg);
 }
 const PICK_CHEV = '<svg viewBox="0 0 24 24" style="width:8px;height:14px"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -119,15 +114,14 @@ function instField(label, d, rebuild, opts = {}) {
     h('span', { style: 'flex:1;text-align:left;' + (inst ? '' : 'color:var(--text-3)'), text: inst ? inst.label : '点击选择' }),
     h('span', { style: 'color:var(--text-4)', html: PICK_CHEV })
   ]);
-  return h('div', { class: 'field' }, [h('label', { text: label }), row]);
+  return fieldControl(label, row);
 }
 
 function openBankPicker(currentId, onPick, opts = {}) {
   const rec = localeDefaultRegion();
   const groups = banksGrouped();
   const listWrap = h('div', { class: 'pick-list' });
-  const search = h('input', { type: 'search', placeholder: '搜索银行 / 机构', oninput: () => renderList(search.value) });
-  const pill = h('div', { class: 'search-pill' }, [h('span', { html: icon('search') }), search]);
+  const search = inputField('搜索银行 / 机构', { type: 'search', oninput: (e) => renderList(e.target.value) });
 
   const match = (b, kw) => (opts.wallets || !b.wallet) && (!kw || b.label.toLowerCase().includes(kw) || (b.en && b.en.toLowerCase().includes(kw)) || b.id.includes(kw));
   const makeRow = (b) => h('button', { class: 'pick-row', onclick: () => { onPick(b.id); ctl.close(); } }, [
@@ -153,7 +147,7 @@ function openBankPicker(currentId, onPick, opts = {}) {
   }
   renderList('');
   const body = h('div', {}, [
-    h('div', { style: 'position:sticky;top:-16px;background:var(--bg);padding:4px 0 12px;z-index:3;margin:-4px 0 0' }, [pill]),
+    h('div', { style: 'position:sticky;top:-16px;background:var(--bg);padding:4px 0 0;z-index:3;margin:-4px 0 0' }, [search]),
     listWrap
   ]);
   const ctl = openSheet('选择银行 / 机构', body);
@@ -162,10 +156,7 @@ function openBankPicker(currentId, onPick, opts = {}) {
 /* ---------- 各类型表单体 ---------- */
 function buildBody(d, rebuild) {
   const frag = document.createDocumentFragment();
-  const liquidToggle = () => h('div', { class: 'field' }, [
-    h('label', { text: '计入流动资金' }),
-    fSeg('', d, '_liquid', [{ v: 'auto', label: '自动' }, { v: 'yes', label: '是' }, { v: 'no', label: '否' }])
-  ]);
+  const liquidToggle = () => fSeg('计入流动资金', d, '_liquid', [{ v: 'auto', label: '自动' }, { v: 'yes', label: '计入流动资金' }, { v: 'no', label: '不计入' }]);
   // 流动资金三态用独立 key 映射
   if (d._liquid === undefined) d._liquid = d.liquid === true ? 'yes' : d.liquid === false ? 'no' : 'auto';
 
@@ -202,11 +193,11 @@ function buildBody(d, rebuild) {
         valuationFields.appendChild(h('div', { class: 'hint', text: `原手动总估值 ${money(num(d.valuationOverride))} 已保留，填写面积和手动单价后替换。` }));
       }
     } else if (d.subKind === 'car') {
-      valuationFields.appendChild(fInput('购入价值', d, 'initialValue', { type: 'number', suffix: '元' }));
       valuationFields.appendChild(h('div', { class: 'field row2' }, [
-        fInput('购入日期', d, 'purchaseDate', { type: 'date' }),
+        fInput('购入价值', d, 'initialValue', { type: 'number', suffix: '元' }),
         fInput('月折损率', d, 'monthlyDepreciationRate', { type: 'number', suffix: '%', ph: '如 1' })
       ]));
+      valuationFields.appendChild(fInput('购入日期', d, 'purchaseDate', { type: 'date' }));
     } else {
       valuationFields.appendChild(fInput('初始价值', d, 'initialValue', { type: 'number', suffix: '元' }));
     }
@@ -266,19 +257,17 @@ function buildBody(d, rebuild) {
   } else if (d.type === 'loan') {
     frag.appendChild(instField('贷款机构', d, rebuild));
     frag.appendChild(fInput('贷款名称', d, 'name', { ph: '如：住房商业贷款' }));
+    frag.appendChild(fInput('贷款总额', d, 'principal', { type: 'number', suffix: '元' }));
     frag.appendChild(h('div', { class: 'field row2' }, [
-      fInput('贷款总额', d, 'principal', { type: 'number', suffix: '元' }),
-      fInput('初始年利率', d, 'initialAnnualRate', { type: 'number', suffix: '%', ph: '如 4.2' })
+      fInput('初始年利率', d, 'initialAnnualRate', { type: 'number', suffix: '%', ph: '如 4.2' }),
+      fInput('贷款期数', d, 'periods', { type: 'number', suffix: '期' })
     ]));
-    frag.appendChild(h('div', { class: 'field row2' }, [
-      fInput('贷款期数', d, 'periods', { type: 'number', suffix: '期' }),
-      fInput('放款日', d, 'disbursementDate', { type: 'date' })
-    ]));
+    frag.appendChild(fInput('放款日', d, 'disbursementDate', { type: 'date' }));
     frag.appendChild(fInput('首次还款日', d, 'firstPaymentDate', { type: 'date' }));
     frag.appendChild(fSeg('还款方式', d, 'repaymentMethod', Object.entries(METHODS).map(([v, label]) => ({ v, label }))));
-    frag.appendChild(h('div', { class: 'field' }, [h('label', { text: '日计息标准' }),
-      (() => { const s = h('select', { onchange: (e) => d.dayCount = e.target.value }); DAYCOUNTS.forEach((dc) => s.appendChild(h('option', { value: dc, selected: d.dayCount === dc ? 'selected' : null, text: dcLabel(dc) }))); return s; })()
-    ]));
+    const dayCount = h('select', { onchange: (e) => d.dayCount = e.target.value });
+    DAYCOUNTS.forEach((dc) => dayCount.appendChild(h('option', { value: dc, selected: d.dayCount === dc ? 'selected' : null, text: dcLabel(dc) })));
+    frag.appendChild(fieldControl('日计息标准', dayCount));
     // 利率变更 / 提前还款 / 还款计划
     frag.appendChild(h('div', { class: 'section-label', text: '利率变更 / 提前还款' }));
     frag.appendChild(listEditor('利率变更', d.rateChanges, (r) => `${r.effectiveDate} → ${r.newAnnualRate}%`, () => rateChangeForm(d, rebuild), (i) => { d.rateChanges.splice(i, 1); rebuild(); }));
@@ -307,7 +296,7 @@ function listEditor(title, arr, fmtItem, onAdd, onDel) {
 
 function rateChangeForm(d, rebuild) {
   const t = { effectiveDate: today(), newAnnualRate: '' };
-  const body = h('div', { class: 'inline-fields' }, [
+  const body = h('div', {}, [
     fInput('生效日期', t, 'effectiveDate', { type: 'date' }),
     fInput('新年利率', t, 'newAnnualRate', { type: 'number', suffix: '%' })
   ]);
@@ -316,7 +305,7 @@ function rateChangeForm(d, rebuild) {
 }
 function prepayForm(d, rebuild) {
   const t = { date: today(), amount: '', mode: 'shorten' };
-  const body = h('div', { class: 'inline-fields' }, [
+  const body = h('div', {}, [
     fInput('还款日期', t, 'date', { type: 'date' }),
     fInput('提前还款金额', t, 'amount', { type: 'number', suffix: '元' }),
     fSeg('方式', t, 'mode', [{ v: 'shorten', label: '缩短期限' }, { v: 'reduce', label: '减少月供' }])

@@ -217,37 +217,90 @@ a { color: var(--accent); text-decoration: none; }
 .icon-btn svg { width: 20px; height: 20px; }
 
 /* ---------- 表单 ---------- */
-.field { margin-bottom: 14px; min-width: 0; }
-.field > label { display: block; font-size: 13px; color: var(--text-3); font-weight: 600; margin-bottom: 6px; padding-left: 2px; }
-.field input, .field select, .field textarea {
-  width: 100%; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 0.5px solid var(--separator);
-  background: var(--card); font-size: 16px; outline: none; transition: border-color .15s;
+.field { margin-bottom: 12px; min-width: 0; }
+.floating-field { padding-top: 7px; }
+.floating-control {
+  position: relative; display: flex; align-items: center; min-width: 0; height: 48px;
+  padding: 1px; border-radius: 10px; background: var(--card);
 }
-.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+.field-outline {
+  position: absolute; inset: -7px 0 0; min-width: 0; margin: 0; padding: 0 7px;
+  border: 1px solid var(--separator-strong); border-radius: inherit; pointer-events: none;
+  transition: border-color .15s;
+}
+.field-outline legend {
+  height: 14px; max-width: 0.01px; padding: 0; font-size: 11px; line-height: 14px;
+  white-space: nowrap; overflow: hidden; visibility: hidden;
+}
+.field-outline legend span { display: inline-block; padding: 0 4px; }
+.floating-control:focus-within > .field-outline { border: 2px solid var(--accent); padding: 0 6px; }
+.floating-control:focus-within > .field-outline legend,
+.floating-control.label-raised > .field-outline legend,
+.floating-control > input:not(:placeholder-shown) ~ .field-outline legend,
+.floating-control > textarea:not(:placeholder-shown) ~ .field-outline legend { max-width: 100%; }
+.floating-control > input, .floating-control > select, .floating-control > textarea {
+  flex: 1; width: 0; min-width: 0; max-width: 100%; height: 46px; padding: 11px 12px;
+  border: 0; border-radius: inherit; background: transparent; color: var(--text);
+  font-size: 16px; line-height: 22px; outline: none;
+}
+.floating-control > select { cursor: pointer; padding-right: 6px; }
+.floating-label {
+  position: absolute; left: 8px; top: 50%; z-index: 1; transform: translateY(-50%);
+  max-width: calc(100% - 16px); padding: 0 4px; background: transparent; color: var(--text-3);
+  font-size: 15px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: text; transition: top .15s, font-size .15s, color .15s;
+}
+.floating-control:focus-within > .floating-label,
+.floating-control.label-raised > .floating-label,
+.floating-control > input:not(:placeholder-shown) ~ .floating-label,
+.floating-control > textarea:not(:placeholder-shown) ~ .floating-label { top: 0; font-size: 11px; line-height: 14px; }
+.floating-control:focus-within > .floating-label { color: var(--accent); }
+.floating-control > input::placeholder, .floating-control > textarea::placeholder { color: transparent; }
+.floating-control > input:focus::placeholder, .floating-control > textarea:focus::placeholder { color: var(--text-4); }
+.field-unit { flex: 0 0 auto; padding-right: 12px; color: var(--text-3); font-size: 12px; white-space: nowrap; opacity: 0; }
+.floating-control:focus-within > .field-unit, .floating-control > input:not(:placeholder-shown) ~ .field-unit { opacity: 1; }
+.segmented-field { align-self: end; }
+.segmented-field .seg button { min-width: 0; white-space: nowrap; }
+.floating-control > .picker-field { min-width: 0; height: 100%; border: 0; border-radius: inherit; padding: 6px 12px; }
+.floating-control > .picker-field > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compact-field { width: 112px; max-width: 100%; flex: 0 0 auto; margin-bottom: 0; }
+.compact-field .floating-control { height: 42px; }
+.compact-field .floating-control > input, .compact-field .floating-control > select { height: 40px; padding: 8px 9px; }
+.compact-field .floating-label { left: 5px; max-width: calc(100% - 10px); font-size: 13px; }
+.compact-field .field-outline { padding: 0 4px; }
+.compact-field .floating-control:focus-within > .field-outline { padding: 0 3px; }
+.compact-field .floating-control > select { padding-right: 3px; }
 .hint { font-size: 12px; color: var(--text-3); line-height: 1.5; }
 .field .hint { font-size: 12px; color: var(--text-3); margin-top: 5px; padding-left: 2px; }
-.field input, .field select { height: 46px; line-height: 20px; }
 .field.row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .field.row2 > .field { margin-bottom: 0; }
-input[type="date"] { min-width: 0; max-width: 100%; height: 46px; padding: 10px; appearance: none; -webkit-appearance: none; }
+.inline-field { display: flex; align-items: center; gap: 12px; }
+.inline-label { flex: 0 0 84px; min-width: 0; }
+.inline-label label { display: block; color: var(--text-2); font-size: 14px; white-space: nowrap; }
+.inline-label .hint { padding-left: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inline-control {
+  flex: 1; min-width: 0; width: 0; height: 48px; padding: 10px 8px;
+  border: 1px solid var(--separator-strong); border-radius: 10px; background: var(--card);
+  font-size: 16px; line-height: 22px; outline: none;
+}
+.inline-control:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.inline-field > input[type="date"] { appearance: none; -webkit-appearance: none; }
+.inline-field > select { flex: 0 0 84px; width: 84px; }
+.inline-compact .inline-control { height: 42px; padding-top: 7px; padding-bottom: 7px; }
+.settings-date .field { width: 100%; margin-bottom: 0; }
+.settings-date .inline-label { flex: 1; }
 input[type="date"]::-webkit-date-and-time-value { min-height: 20px; text-align: left; }
 input[type="date"]::-webkit-datetime-edit { min-width: 0; padding: 0; }
-.input-unit { display: flex; align-items: center; min-width: 0; height: 46px; border: 0.5px solid var(--separator); border-radius: 12px; background: var(--card); }
-.input-unit:focus-within { border-color: var(--accent); }
-.field .input-unit input { flex: 1; min-width: 0; width: 0; height: 44px; border: 0; background: transparent; padding-right: 4px; }
-.input-unit > span { flex-shrink: 0; padding-right: 12px; color: var(--text-3); font-size: 13px; white-space: nowrap; }
-.inline-fields > .field { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 10px; }
-.inline-fields > .field > label { margin: 0; padding: 0; }
-.inline-fields .seg button { min-width: 0; padding: 10px 4px; font-size: 12px; }
 .valuation-preview { padding: 12px; margin: 0 0 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--card)); color: var(--accent); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.reconcile-date { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 155px); align-items: center; gap: 10px; }
-.reconcile-date input, .credit-entry input { width: 100%; min-width: 0; border: 0.5px solid var(--separator); border-radius: 10px; background: var(--card); font-size: 16px; }
-.reconcile-credit { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 8px 12px; }
-.reconcile-credit .row-sub { white-space: normal; overflow-wrap: anywhere; }
-.credit-entry { grid-column: 2; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
-.credit-entry label, .credit-debt { font-size: 12px; color: var(--text-3); }
-.credit-entry input { padding: 8px; text-align: right; font-family: var(--num); }
-.credit-debt { grid-column: 1 / -1; text-align: right; overflow-wrap: anywhere; }
+.reconcile-date .field { margin-bottom: 0; }
+.reconcile-actions { display: flex; gap: 10px; margin-bottom: 14px; }
+.reconcile-actions .btn { flex: 1; min-width: 0; font-size: 13px; padding: 10px; white-space: nowrap; }
+.reconcile-actions svg { width: 18px; height: 18px; flex-shrink: 0; }
+.reconcile-rows .row { gap: 8px; padding: 10px 12px; }
+.reconcile-rows .badge { width: 32px; height: 32px; border-radius: 9px; }
+.reconcile-rows .row-sub { font-size: 11px; }
+.reconcile-rows .compact-field { flex-basis: 112px; }
+.reconcile-rows input { text-align: right; font-family: var(--num); }
 .reconcile-summary { display: flex; flex-wrap: wrap; justify-content: space-around; text-align: center; gap: 14px; margin-top: 14px; }
 .seg { display:flex; background: var(--card-2); border-radius: 12px; padding: 3px; gap: 3px; }
 .seg button { flex:1; padding: 9px 6px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--text-2); }
@@ -401,7 +454,8 @@ svg.chevron { width:7px; height:12px; }
 /* 图表卡工具条 */
 .chart-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
 .chart-head .seg { background:var(--card-2); }
-.range-sel { font-size:12px; min-height:30px; padding:5px 10px; border-radius:8px; border:0.5px solid var(--separator); background:var(--card-2); color:var(--text-2); width:auto; }
+.chart-head .compact-field { width:96px; }
+.chart-head .compact-field select { font-size:12px; }
 .donut-chart { display:flex; gap:16px; align-items:center; justify-content:center; flex-wrap:wrap; }
 .donut-legend { flex:1 1 220px; min-width:0; display:flex; flex-direction:column; gap:9px; }
 

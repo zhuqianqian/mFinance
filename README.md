@@ -34,8 +34,8 @@ python3 -m http.server 8777
 - 导入支持「合并」；整体覆盖请先「清空全部数据」再导入。
 
 ## 更新版本（重要）
-Service Worker 采用缓存优先策略以支持离线。**每次改动代码后**，请把 `sw.js` 顶部的
-`const CACHE = 'mfinance-v7'` 版本号 +1，并同步更新 `js/views/settings.js` 中的 `APP_VERSION`。
+Service Worker 采用缓存优先策略以支持离线。开发和样式调整期间不改版本号；**仅在明确要求升级发布时**，把 `sw.js` 顶部的
+`const CACHE = 'mfinance-v4'` 版本号 +1，并同步更新 `js/views/settings.js` 中的 `APP_VERSION`。
 「我的」页面会显示应用版本；用户下次联网打开会下载新缓存，重新打开或刷新页面后使用新版。
 
 ## 关于联网行情
@@ -55,5 +55,6 @@ manifest.webmanifest  安装清单
 sw.js                 Service Worker（离线缓存，更新时改版本号）
 css/app.css           设计系统（深浅色、安全区适配）
 js/                   app 路由 + store/models/loan/valuation/charts/icons + views/*
+js/forms.js           浮动标签输入、下拉框、选择器的共享构件
 assets/ icons/        应用图标与机构徽标
 ```

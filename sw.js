@@ -1,5 +1,5 @@
 /* 掌上资产 Service Worker —— app shell 预缓存，离线可用 */
-const CACHE = 'mfinance-v3'; // 与 js/views/settings.js 的 APP_VERSION 同步更新
+const CACHE = 'mfinance-v4'; // 与 js/views/settings.js 的 APP_VERSION 同步更新
 const IMG_CACHE = 'mfinance-img-v1';
 const SHELL = [
   './',
@@ -8,6 +8,7 @@ const SHELL = [
   './manifest.webmanifest',
   './js/app.js',
   './js/util.js',
+  './js/forms.js',
   './js/store.js',
   './js/icons.js',
   './js/models.js',

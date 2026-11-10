@@ -1,9 +1,10 @@
 // js/views/settings.js —— 设置：对账日、主题、导入导出、示例数据、清空
 import { h, toast, confirmDialog, today, fmtDate, num } from '../util.js';
+import { inlineField } from '../forms.js';
 import { getSettings, updateSettings, exportJSON, importJSON, wipeAll, getAccounts, getSnapshots, addAccount, putSnapshot } from '../store.js';
 
 // 发布时与 sw.js 的缓存版本同步，表示当前页面代码的版本。
-const APP_VERSION = 'v3';
+const APP_VERSION = 'v4';
 
 function applyThemeNow(t) {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
@@ -18,12 +19,11 @@ export function render() {
   // 对账日
   root.appendChild(h('div', { class: 'section-label', text: '对账' }));
   const dayRow = h('div', { class: 'rows' }, [
-    h('div', { class: 'row' }, [
-      h('div', { class: 'row-main' }, [h('div', { class: 'row-title', style: 'font-size:15px', text: '每月对账日' }), h('div', { class: 'row-sub', text: '贷款与投资按此日自动结转' })]),
+    h('div', { class: 'row settings-date' }, [
       (() => {
-        const sel = h('select', { style: 'width:auto', onchange: (e) => { updateSettings({ reconcileDay: +e.target.value }); toast('已更新'); } });
+        const sel = h('select', { onchange: (e) => { updateSettings({ reconcileDay: +e.target.value }); toast('已更新'); } });
         for (let i = 1; i <= 28; i++) sel.appendChild(h('option', { value: i, selected: s.reconcileDay === i ? 'selected' : null, text: i + ' 日' }));
-        return sel;
+        return inlineField('每月对账日', sel, { hint: '贷款与投资按此日自动结转', compact: true });
       })()
     ])
   ]);

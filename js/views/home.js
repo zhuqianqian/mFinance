@@ -1,5 +1,6 @@
 // js/views/home.js —— 首页：净资产卡 + 指标面板 + 趋势(可切指标/区间) + 资产构成
 import { h, money, moneyShort, pct, clear } from '../util.js';
+import { fieldControl } from '../forms.js';
 import { headline, series } from '../models.js';
 import { getAccounts } from '../store.js';
 import { icon } from '../icons.js';
@@ -76,13 +77,13 @@ export function render() {
   [['net', '净资产'], ['ratio', '负债率']].forEach(([v, label]) => {
     seg.appendChild(h('button', { class: state.metric === v ? 'active' : '', text: label, onclick: (e) => { state.metric = v; [...seg.children].forEach((b) => b.classList.remove('active')); e.target.classList.add('active'); drawChart(); } }));
   });
-  const rangeSel = h('select', { class: 'range-sel', onchange: (e) => { state.range = +e.target.value; drawChart(); } }, [
+  const rangeSel = h('select', { onchange: (e) => { state.range = +e.target.value; drawChart(); } }, [
     h('option', { value: '0', text: '全部' }),
     h('option', { value: '6', text: '近 6 期' }),
     h('option', { value: '12', text: '近 12 期' })
   ]);
   const trend = h('div', { class: 'card' }, [
-    h('div', { class: 'chart-head' }, [seg, rangeSel]),
+    h('div', { class: 'chart-head' }, [seg, fieldControl('时间范围', rangeSel, { compact: true })]),
     chartBox
   ]);
   root.appendChild(trend);

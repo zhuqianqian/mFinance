@@ -1,5 +1,6 @@
 // js/views/account-detail.js —— 账户详情：基本信息 + 历史对账 + 贷款统计/操作
-import { h, money, moneyShort, pct, num, today, toast, confirmDialog, openSheet, uid } from '../util.js';
+import { h, money, moneyShort, pct, num, today, toast, confirmDialog, openSheet } from '../util.js';
+import { inputField, segmentedField } from '../forms.js';
 import { getAccount, snapshotsOf, updateAccount, deleteSnapshot } from '../store.js';
 import { TYPES, CASH_SUBKINDS, liveValuation, accountDisplay, fixedValue, carMonthlyRate } from '../models.js';
 import { accountBadge, INSTITUTIONS, icon } from '../icons.js';
@@ -160,15 +161,12 @@ async function delItem(acc, key, item) {
 
 /* 持久化的提前还款 / 利率变更表单 */
 function tInput(label, obj, key, { type = 'text', suffix = '' } = {}) {
-  const id = uid();
-  const input = h('input', { id, type: type === 'number' ? 'text' : type, inputmode: type === 'number' ? 'decimal' : null, value: obj[key] ?? '', oninput: (e) => obj[key] = e.target.value });
-  const inner = suffix ? h('div', { class: 'input-unit' }, [input, h('span', { text: suffix })]) : input;
-  return h('div', { class: 'field' }, [h('label', { for: id, text: label }), inner]);
+  return inputField(label, { type, suffix, value: obj[key], oninput: (e) => obj[key] = e.target.value });
 }
 function tSeg(label, obj, key, opts) {
   const seg = h('div', { class: 'seg' });
   opts.forEach((o) => seg.appendChild(h('button', { class: obj[key] === o.v ? 'active' : '', text: o.label, onclick: (e) => { obj[key] = o.v; [...seg.children].forEach((b) => b.classList.remove('active')); e.target.classList.add('active'); } })));
-  return h('div', { class: 'field' }, [h('label', { text: label }), seg]);
+  return segmentedField(label, seg);
 }
 function prepayForm(acc) {
   const t = { date: today(), amount: '', mode: 'shorten' };
@@ -183,13 +181,13 @@ function prepayForm(acc) {
   const amtF = tInput('提前还款金额', t, 'amount', { type: 'number', suffix: '元' });
   dateF.querySelector('input').addEventListener('input', refresh);
   amtF.querySelector('input').addEventListener('input', refresh);
-  const body = h('div', { class: 'inline-fields' }, [dateF, amtF, info, tSeg('方式', t, 'mode', [{ v: 'shorten', label: '缩短期限' }, { v: 'reduce', label: '减少月供' }])]);
+  const body = h('div', {}, [dateF, amtF, info, tSeg('方式', t, 'mode', [{ v: 'shorten', label: '缩短期限' }, { v: 'reduce', label: '减少月供' }])]);
   const save = h('button', { class: 'btn ghost', style: 'color:var(--accent);font-weight:700', text: '保存', onclick: () => { if (!num(t.amount)) { toast('请输入金额'); return; } updateAccount(acc.id, { prepayments: [...(acc.prepayments || []), { date: t.date, amount: num(t.amount), mode: t.mode }] }); ctl.close(); toast('已添加提前还款'); } });
   const ctl = openSheet('安排提前还款', body, { rightBtn: save });
 }
 function rateForm(acc) {
   const t = { effectiveDate: today(), newAnnualRate: '' };
-  const body = h('div', { class: 'inline-fields' }, [tInput('生效日期', t, 'effectiveDate', { type: 'date' }), tInput('新年利率', t, 'newAnnualRate', { type: 'number', suffix: '%' })]);
+  const body = h('div', {}, [tInput('生效日期', t, 'effectiveDate', { type: 'date' }), tInput('新年利率', t, 'newAnnualRate', { type: 'number', suffix: '%' })]);
   const save = h('button', { class: 'btn ghost', style: 'color:var(--accent);font-weight:700', text: '保存', onclick: () => { if (!num(t.newAnnualRate)) { toast('请输入利率'); return; } updateAccount(acc.id, { rateChanges: [...(acc.rateChanges || []), { effectiveDate: t.effectiveDate, newAnnualRate: num(t.newAnnualRate) / 100 }] }); ctl.close(); toast('已记录利率变更'); } });
   const ctl = openSheet('记录利率变更', body, { rightBtn: save });
 }
