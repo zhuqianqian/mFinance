@@ -1,47 +1,37 @@
-// 表单控件：文本使用浮动标签，日期使用普通行内标签。
+// 统一的朴素表单控件：标签与控件默认同排，必要时可改为整行。
 import { h, uid } from './util.js';
 
-export function fieldControl(label, control, { hint = '', suffix = '', compact = false } = {}) {
-  if (control.tagName === 'INPUT' && control.type === 'date') return inlineField(label, control, { hint, compact });
+export function fieldControl(label, control, { hint = '', suffix = '', compact = false, stacked = false, hideLabel = false } = {}) {
   const id = control.id || uid();
   control.id = id;
   const labelId = `${id}-label`;
   const hintId = `${id}-hint`;
-  const isInput = control.tagName === 'INPUT' || control.tagName === 'TEXTAREA';
-  const isStatic = !isInput;
-  if (isInput && !control.placeholder) control.placeholder = ' ';
-  const labelable = isInput || control.tagName === 'SELECT' || control.tagName === 'BUTTON';
-  if (!labelable) {
+  const labelable = ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(control.tagName);
+  if (hideLabel) control.setAttribute('aria-label', control.getAttribute('aria-label') || label);
+  else if (!labelable) {
     control.setAttribute('role', 'group');
     control.setAttribute('aria-labelledby', labelId);
   }
   if (hint) control.setAttribute('aria-describedby', hintId);
-  return h('div', { class: 'field floating-field' + (compact ? ' compact-field' : '') }, [
-    h('div', { class: 'floating-control' + (isStatic ? ' label-raised' : '') }, [
+
+  const classes = ['field', 'form-field'];
+  if (compact) classes.push('compact-field');
+  if (stacked) classes.push('stacked-field');
+  if (hideLabel) classes.push('unlabeled-field');
+  return h('div', { class: classes.join(' ') }, [
+    hideLabel ? null : h(labelable ? 'label' : 'span', {
+      id: labelId, for: labelable ? id : null, class: 'form-label', text: label
+    }),
+    h('div', { class: 'form-control' }, [
       control,
-      h(labelable ? 'label' : 'span', { id: labelId, for: labelable ? id : null, class: 'floating-label', text: label }),
-      // legend 为边框留出缺口，标签本身无需用实色背景遮挡边框。
-      h('fieldset', { class: 'field-outline', 'aria-hidden': 'true' }, [
-        h('legend', {}, [h('span', { text: label })])
-      ]),
       suffix ? h('span', { class: 'field-unit', 'aria-hidden': 'true', text: suffix }) : null
     ]),
-    hint ? h('div', { id: hintId, class: 'hint', text: hint }) : null
+    hint ? h('div', { id: hintId, class: 'field-hint', text: hint }) : null
   ]);
 }
 
-export function inlineField(label, control, { hint = '', compact = false } = {}) {
-  const id = control.id || uid();
-  control.id = id;
-  control.classList.add('inline-control');
-  if (hint) control.setAttribute('aria-describedby', `${id}-hint`);
-  return h('div', { class: 'field inline-field' + (compact ? ' inline-compact' : '') }, [
-    h('div', { class: 'inline-label' }, [
-      h('label', { for: id, text: label }),
-      hint ? h('div', { id: `${id}-hint`, class: 'hint', text: hint }) : null
-    ]),
-    control
-  ]);
+export function inlineField(label, control, options = {}) {
+  return fieldControl(label, control, options);
 }
 
 export function segmentedField(label, control) {
@@ -50,12 +40,12 @@ export function segmentedField(label, control) {
   return h('div', { class: 'field segmented-field' }, [control]);
 }
 
-export function inputField(label, { type = 'text', value = '', placeholder = '', hint = '', suffix = '', compact = false, oninput, onchange } = {}) {
+export function inputField(label, { type = 'text', value = '', placeholder = '', hint = '', suffix = '', compact = false, stacked = false, hideLabel = false, oninput, onchange } = {}) {
   const input = h('input', {
     type: type === 'number' ? 'text' : type,
     inputmode: type === 'number' ? 'decimal' : null,
-    value: value ?? '', placeholder: type === 'date' ? null : placeholder || ' ',
+    value: value ?? '', placeholder: type === 'date' ? null : placeholder,
     oninput, onchange
   });
-  return fieldControl(label, input, { hint, suffix, compact });
+  return fieldControl(label, input, { hint, suffix, compact, stacked, hideLabel });
 }

@@ -79,7 +79,7 @@ export function render() {
       rows.appendChild(h('div', { class: 'row' }, [
         accountBadge(a),
         h('div', { class: 'row-main' }, [
-          h('div', { class: 'row-title', style: 'font-size:15px', text: a.name }),
+          h('div', { class: 'row-title', text: a.name }),
           sub
         ]),
         entry
@@ -115,7 +115,7 @@ export function render() {
     e.currentTarget.disabled = true;
     toast('正在联网获取行情…');
     const res = await updateAllQuotes(accounts, (acc, q) => {
-      if (q) { delete state.vals[acc.id]; updateAccount(acc.id, { latestPrice: q.price, priceUpdatedAt: new Date().toISOString() }); }
+      if (q) { delete state.vals[acc.id]; updateAccount(acc.id, { latestPrice: q.price, quoteDate: q.time, priceUpdatedAt: new Date().toISOString() }); }
     });
     toast(`行情更新：成功 ${res.ok} · 失败 ${res.fail}`);
     rerender();

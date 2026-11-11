@@ -72,7 +72,7 @@ function clean(d) {
   } else if (d.type === 'investment') {
     o.subKind = d.subKind; o.code = (d.code || '').trim(); o.market = d.market || '';
     o.holdingQty = num(d.holdingQty); o.latestPrice = num(d.latestPrice); o.costTotal = num(d.costTotal);
-    o.priceUpdatedAt = d.priceUpdatedAt || null;
+    o.priceUpdatedAt = d.priceUpdatedAt || null; o.quoteDate = d.quoteDate || null;
   } else if (d.type === 'loan') {
     Object.assign(o, {
       institutionId: d.institutionId, principal: num(d.principal),
@@ -87,9 +87,9 @@ function clean(d) {
 }
 
 /* ---------- 字段构件 ---------- */
-function fInput(label, d, key, { type = 'text', ph = '', hint = '', suffix = '' } = {}) {
+function fInput(label, d, key, { type = 'text', ph = '', hint = '', suffix = '', stacked = false } = {}) {
   return inputField(label, {
-    type, value: d[key], placeholder: ph, hint, suffix,
+    type, value: d[key], placeholder: ph, hint, suffix, stacked,
     oninput: (e) => { d[key] = e.target.value; }
   });
 }
@@ -121,7 +121,7 @@ function openBankPicker(currentId, onPick, opts = {}) {
   const rec = localeDefaultRegion();
   const groups = banksGrouped();
   const listWrap = h('div', { class: 'pick-list' });
-  const search = inputField('搜索银行 / 机构', { type: 'search', oninput: (e) => renderList(e.target.value) });
+  const search = inputField('搜索银行 / 机构', { type: 'search', placeholder: '搜索银行 / 机构', hideLabel: true, oninput: (e) => renderList(e.target.value) });
 
   const match = (b, kw) => (opts.wallets || !b.wallet) && (!kw || b.label.toLowerCase().includes(kw) || (b.en && b.en.toLowerCase().includes(kw)) || b.id.includes(kw));
   const makeRow = (b) => h('button', { class: 'pick-row', onclick: () => { onPick(b.id); ctl.close(); } }, [
@@ -247,9 +247,9 @@ function buildBody(d, rebuild) {
         e.target.disabled = true; e.target.textContent = '获取中…';
         try {
           const q = await fetchQuote(clean(d));
-          d.latestPrice = q.price; d.priceUpdatedAt = new Date().toISOString();
+          d.latestPrice = q.price; d.quoteDate = q.time; d.priceUpdatedAt = new Date().toISOString();
           if (!d.name && q.name) d.name = q.name;
-          toast(`已更新：${q.price}`); rebuild();
+          toast(`已更新：${q.price}${q.time ? ` · ${q.time}` : ''}`); rebuild();
         } catch (err) { toast('获取失败，请手动填写'); e.target.disabled = false; e.target.textContent = '🔄 联网获取最新价'; }
       }
     }));
@@ -274,7 +274,7 @@ function buildBody(d, rebuild) {
     frag.appendChild(listEditor('提前还款', d.prepayments, (p) => `${p.date} · ${moneyShort(num(p.amount))} · ${p.mode === 'shorten' ? '缩期' : '降月供'}`, () => prepayForm(d, rebuild), (i) => { d.prepayments.splice(i, 1); rebuild(); }));
     frag.appendChild(h('button', { class: 'btn block', style: 'margin-top:8px', text: '📋 查看还款计划', onclick: () => openSchedule(clean(d)) }));
   }
-  frag.appendChild(fInput('备注（可选）', d, 'note', {}));
+  frag.appendChild(fInput('备注（可选）', d, 'note', { stacked: true }));
   return frag;
 }
 function dcLabel(dc) {

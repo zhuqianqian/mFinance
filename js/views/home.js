@@ -1,10 +1,9 @@
 // js/views/home.js —— 首页：净资产卡 + 指标面板 + 趋势(可切指标/区间) + 资产构成
 import { h, money, moneyShort, pct, clear } from '../util.js';
-import { fieldControl } from '../forms.js';
 import { headline, series } from '../models.js';
-import { getAccounts } from '../store.js';
-import { icon } from '../icons.js';
-import { lineChart, donutChart } from '../charts.js';
+import { getAccounts, snapshotsOf } from '../store.js';
+import { icon, INSTITUTIONS } from '../icons.js';
+import { dualAxisChart, stackedBarChart, donutChart } from '../charts.js';
 
 const CAT_SLOT = { '资产账户': 0, '股票 / 基金': 1, '固定资产': 2, '信用卡': 4, '贷款': 5, '其他': 3 };
 const catColorVar = (cat) => `var(--cat-${(CAT_SLOT[cat] ?? 7) + 1})`;
@@ -13,9 +12,39 @@ function cssResolve(varExpr) {
   return m ? (getComputedStyle(document.documentElement).getPropertyValue(m[0]).trim() || '#888') : varExpr;
 }
 function debtRatioLevel(ratio) {
-  if (ratio < 0.2) return { label: '偏低', color: 'var(--teal)' };
-  if (ratio <= 0.5) return { label: '健康', color: 'var(--positive)' };
-  return { label: '偏高', color: 'var(--negative)' };
+  if (ratio < 0.2) return { label: '偏低', color: 'var(--ratio-low)' };
+  if (ratio <= 0.5) return { label: '健康', color: 'var(--ratio-healthy)' };
+  return { label: '偏高', color: 'var(--ratio-high)' };
+}
+
+function creditChartData(dates) {
+  const fallback = ['#e76f51', '#f4a261', '#c44536', '#d1495b', '#b56576', '#e07a5f'];
+  const used = new Set();
+  const cards = getAccounts({ includeArchived: true }).filter((a) => a.type === 'credit');
+  const cardSeries = cards.map((card, i) => {
+    const institutionColor = card.color || INSTITUTIONS[card.institutionId]?.color;
+    let color = institutionColor || fallback[i % fallback.length];
+    if (used.has(color.toLowerCase())) color = fallback.find((candidate) => !used.has(candidate.toLowerCase())) || fallback[i % fallback.length];
+    used.add(color.toLowerCase());
+    return { id: card.id, label: card.name || INSTITUTIONS[card.institutionId]?.label || `信用卡 ${i + 1}`, color };
+  });
+  const histories = new Map(cards.map((card) => [card.id, snapshotsOf(card.id).filter((snap) => snap.kind === 'liability')]));
+  const cursors = new Map(cards.map((card) => [card.id, 0]));
+  const latest = new Map();
+  const rows = dates.map((date) => {
+    const values = {};
+    cards.forEach((card) => {
+      const history = histories.get(card.id);
+      let cursor = cursors.get(card.id);
+      while (cursor < history.length && history[cursor].date <= date) {
+        latest.set(card.id, history[cursor]); cursor += 1;
+      }
+      cursors.set(card.id, cursor);
+      values[card.id] = Math.max(0, +(latest.get(card.id)?.value || 0));
+    });
+    return { date, values };
+  });
+  return { rows, cardSeries };
 }
 
 // 把 money 的 ¥ 拆成小号前缀
@@ -59,31 +88,32 @@ export function render() {
     metric('负债率', pct(cur.debtRatio), debtLevel.color, { colorValue: true, status: debtLevel.label, hint: '低于 20%：偏低；20%–50%：健康；高于 50%：偏高' })
   ]));
 
-  // 趋势图（可切换指标与区间）
+  // 趋势图（财务双轴 / 信用卡堆叠，可切换区间）
   const s = series();
-  const state = { metric: 'net', range: 0 };
+  const creditData = creditChartData(s.map((p) => p.date));
+  const state = { view: 'finance', range: 0 };
   const chartBox = h('div', { style: 'margin-top:8px' });
   function drawChart() {
     clear(chartBox);
-    let data = state.range ? s.slice(-state.range) : s;
-    const isPct = state.metric === 'ratio';
-    const pts = data.map((p) => ({ date: p.date, value: isPct ? p.debtRatio : p.net }));
-    chartBox.appendChild(lineChart(pts, {
-      fmt: isPct ? (v) => pct(v) : moneyShort, percent: isPct,
-      color: cssResolve(isPct ? 'var(--cat-6)' : 'var(--cat-1)')
-    }));
+    if (state.view === 'credit') {
+      const rows = state.range ? creditData.rows.slice(-state.range) : creditData.rows;
+      chartBox.appendChild(stackedBarChart(rows, creditData.cardSeries));
+    } else {
+      const data = state.range ? s.slice(-state.range) : s;
+      chartBox.appendChild(dualAxisChart(data.map((p) => ({ date: p.date, net: p.net, debtRatio: p.debtRatio }))));
+    }
   }
   const seg = h('div', { class: 'seg', style: 'width:auto' });
-  [['net', '净资产'], ['ratio', '负债率']].forEach(([v, label]) => {
-    seg.appendChild(h('button', { class: state.metric === v ? 'active' : '', text: label, onclick: (e) => { state.metric = v; [...seg.children].forEach((b) => b.classList.remove('active')); e.target.classList.add('active'); drawChart(); } }));
+  [['finance', '财务趋势'], ['credit', '信用卡']].forEach(([v, label]) => {
+    seg.appendChild(h('button', { class: state.view === v ? 'active' : '', text: label, onclick: (e) => { state.view = v; [...seg.children].forEach((b) => b.classList.remove('active')); e.currentTarget.classList.add('active'); drawChart(); } }));
   });
-  const rangeSel = h('select', { onchange: (e) => { state.range = +e.target.value; drawChart(); } }, [
+  const rangeSel = h('select', { class: 'range-sel', 'aria-label': '时间范围', onchange: (e) => { state.range = +e.target.value; drawChart(); } }, [
     h('option', { value: '0', text: '全部' }),
     h('option', { value: '6', text: '近 6 期' }),
     h('option', { value: '12', text: '近 12 期' })
   ]);
   const trend = h('div', { class: 'card' }, [
-    h('div', { class: 'chart-head' }, [seg, fieldControl('时间范围', rangeSel, { compact: true })]),
+    h('div', { class: 'chart-head' }, [seg, rangeSel]),
     chartBox
   ]);
   root.appendChild(trend);

@@ -10,6 +10,37 @@ const svgEl = (tag, attrs = {}) => {
 function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 export function catColor(i) { return cssVar(`--cat-${(i % 8) + 1}`); }
 
+function niceScale(values, { floorZero = false, minMax = null, tickCount = 4 } = {}) {
+  let min = Math.min(...values), max = Math.max(...values);
+  if (minMax != null) max = Math.max(max, minMax);
+  if (floorZero) min = Math.min(0, min);
+  if (min === max) {
+    const spread = Math.abs(min) * 0.1 || 1;
+    min = floorZero ? 0 : min - spread; max += spread;
+  }
+  const rough = (max - min) / tickCount;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+  const step = ([1, 2, 2.5, 5, 10].find((n) => n * magnitude >= rough) || 10) * magnitude;
+  min = floorZero ? 0 : Math.floor(min / step) * step;
+  max = Math.ceil(max / step) * step;
+  return { min, max, step, ticks: Array.from({ length: Math.round((max - min) / step) + 1 }, (_, i) => min + i * step) };
+}
+
+function axisMoney(value, scale) {
+  const largest = Math.max(Math.abs(scale.min), Math.abs(scale.max));
+  const unit = largest >= 1e8 ? 1e8 : largest >= 1e4 ? 1e4 : 1;
+  const suffix = unit === 1e8 ? '亿' : unit === 1e4 ? '万' : '';
+  const scaled = value / unit;
+  const decimals = Math.abs(scaled - Math.round(scaled)) < 1e-7 ? 0 : 1;
+  return `¥${scaled.toFixed(decimals)}${suffix}`;
+}
+
+function ratioMeta(value) {
+  if (value < 0.2) return { label: '偏低', color: cssVar('--ratio-low') };
+  if (value <= 0.5) return { label: '健康', color: cssVar('--ratio-healthy') };
+  return { label: '偏高', color: cssVar('--ratio-high') };
+}
+
 /* ---------- 趋势折线（单系列，含十字光标 tooltip） ---------- */
 export function lineChart(points, { height = 190, fmt = moneyShort, percent = false, color = null } = {}) {
   const wrap = h('div', { style: 'position:relative;width:100%;touch-action:pan-y;' });
@@ -95,6 +126,184 @@ export function lineChart(points, { height = 190, fmt = moneyShort, percent = fa
     tip.style.top = '0px';
   }
   function end() { cursor.setAttribute('opacity', 0); dot.setAttribute('opacity', 0); tip.style.opacity = '0'; }
+  svg.addEventListener('pointermove', (e) => move(e.clientX));
+  svg.addEventListener('pointerdown', (e) => move(e.clientX));
+  svg.addEventListener('pointerleave', end);
+  return wrap;
+}
+
+/* ---------- 净资产 + 负债率双 Y 轴（负债率按健康区间分色） ---------- */
+export function dualAxisChart(points, { height = 220 } = {}) {
+  const wrap = h('div', { class: 'dual-axis-chart', style: 'position:relative;width:100%;touch-action:pan-y;' });
+  if (!points.length) {
+    wrap.appendChild(h('div', { class: 'chart-empty', text: '暂无趋势数据' }));
+    return wrap;
+  }
+
+  const W = 360, H = height, padL = 50, padR = 40, padT = 31, padB = 26;
+  const netScale = niceScale(points.map((p) => p.net));
+  const ratioScale = niceScale(points.map((p) => p.debtRatio), { floorZero: true, minMax: 0.6, tickCount: 3 });
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, preserveAspectRatio: 'none', style: 'display:block', role: 'img', 'aria-label': '净资产与负债率趋势图' });
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const xs = points.map((_, i) => points.length === 1 ? padL + plotW / 2 : padL + i * plotW / (points.length - 1));
+  const netY = (v) => padT + (1 - (v - netScale.min) / (netScale.max - netScale.min)) * plotH;
+  const ratioY = (v) => padT + (1 - (v - ratioScale.min) / (ratioScale.max - ratioScale.min)) * plotH;
+  const grid = cssVar('--chart-grid'), text3 = cssVar('--text-3');
+  const netColor = cssVar('--cat-1');
+
+  // 图例同时说明双轴归属。
+  const legend = svgEl('g');
+  legend.appendChild(svgEl('line', { x1: padL, y1: 11, x2: padL + 14, y2: 11, stroke: netColor, 'stroke-width': 2.5, 'stroke-linecap': 'round' }));
+  const netLegend = svgEl('text', { x: padL + 19, y: 11, 'dominant-baseline': 'middle', fill: text3, 'font-size': 11 });
+  netLegend.textContent = '净资产'; legend.appendChild(netLegend);
+  const ratioLegendX = W - padR - 85;
+  [cssVar('--ratio-healthy'), cssVar('--ratio-low'), cssVar('--ratio-high')].forEach((color, i) => {
+    legend.appendChild(svgEl('line', { x1: ratioLegendX + i * 5, y1: 11, x2: ratioLegendX + 7 + i * 5, y2: 11, stroke: color, 'stroke-width': 2.5, 'stroke-linecap': 'round' }));
+  });
+  const ratioLegend = svgEl('text', { x: ratioLegendX + 24, y: 11, 'dominant-baseline': 'middle', fill: text3, 'font-size': 11 });
+  ratioLegend.textContent = '负债率'; legend.appendChild(ratioLegend);
+  svg.appendChild(legend);
+
+  netScale.ticks.forEach((value) => {
+    const y = netY(value);
+    svg.appendChild(svgEl('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: grid, 'stroke-width': 1 }));
+    const label = svgEl('text', { x: padL - 7, y, 'text-anchor': 'end', 'dominant-baseline': 'middle', fill: text3, 'font-size': 10.5 });
+    label.textContent = axisMoney(value, netScale); svg.appendChild(label);
+  });
+  ratioScale.ticks.forEach((value) => {
+    const y = ratioY(value);
+    const label = svgEl('text', { x: W - padR + 7, y, 'text-anchor': 'start', 'dominant-baseline': 'middle', fill: text3, 'font-size': 10.5 });
+    label.textContent = `${Math.round(value * 100)}%`; svg.appendChild(label);
+  });
+  svg.appendChild(svgEl('line', { x1: padL, y1: padT, x2: padL, y2: H - padB, stroke: grid, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: W - padR, y1: padT, x2: W - padR, y2: H - padB, stroke: grid, 'stroke-width': 1 }));
+
+  // 净资产保留一层很淡的面积，避免两条线视觉权重相同。
+  const gradId = `dual-net-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const grad = svgEl('linearGradient', { id: gradId, x1: 0, y1: 0, x2: 0, y2: 1 });
+  grad.appendChild(svgEl('stop', { offset: 0, 'stop-color': netColor, 'stop-opacity': 0.18 }));
+  grad.appendChild(svgEl('stop', { offset: 1, 'stop-color': netColor, 'stop-opacity': 0 }));
+  const defs = svgEl('defs'); defs.appendChild(grad); svg.appendChild(defs);
+  const netArea = `M${xs[0]},${netY(points[0].net)} ` + xs.map((x, i) => `L${x},${netY(points[i].net)}`).join(' ') + ` L${xs.at(-1)},${H - padB} L${xs[0]},${H - padB} Z`;
+  svg.appendChild(svgEl('path', { d: netArea, fill: `url(#${gradId})` }));
+  const netLine = `M` + xs.map((x, i) => `${x},${netY(points[i].net)}`).join(' L');
+  svg.appendChild(svgEl('path', { d: netLine, fill: 'none', stroke: netColor, 'stroke-width': 2.25, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }));
+
+  // 每段负债率折线采用终点所属区间的颜色，点本身精确表达当期状态。
+  if (points.length === 1) {
+    const meta = ratioMeta(points[0].debtRatio);
+    svg.appendChild(svgEl('circle', { cx: xs[0], cy: ratioY(points[0].debtRatio), r: 3.2, fill: meta.color, stroke: cssVar('--card'), 'stroke-width': 1.5 }));
+  } else {
+    for (let i = 1; i < points.length; i++) {
+      const color = ratioMeta(points[i].debtRatio).color;
+      svg.appendChild(svgEl('line', { x1: xs[i - 1], y1: ratioY(points[i - 1].debtRatio), x2: xs[i], y2: ratioY(points[i].debtRatio), stroke: color, 'stroke-width': 2.25, 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' }));
+    }
+    points.forEach((p, i) => {
+      const meta = ratioMeta(p.debtRatio);
+      svg.appendChild(svgEl('circle', { cx: xs[i], cy: ratioY(p.debtRatio), r: 2.5, fill: meta.color, stroke: cssVar('--card'), 'stroke-width': 1.2 }));
+    });
+  }
+
+  [0, ...(points.length > 1 ? [points.length - 1] : [])].forEach((i) => {
+    const label = svgEl('text', { x: xs[i], y: H - 3, 'text-anchor': points.length === 1 ? 'middle' : i === 0 ? 'start' : 'end', fill: text3, 'font-size': 10.5 });
+    label.textContent = points[i].date.slice(2); svg.appendChild(label);
+  });
+
+  const cursor = svgEl('line', { x1: 0, y1: padT, x2: 0, y2: H - padB, stroke: text3, 'stroke-width': 1, opacity: 0 });
+  const netDot = svgEl('circle', { r: 4, fill: netColor, stroke: cssVar('--card'), 'stroke-width': 2, opacity: 0 });
+  const ratioDot = svgEl('circle', { r: 4, stroke: cssVar('--card'), 'stroke-width': 2, opacity: 0 });
+  svg.appendChild(cursor); svg.appendChild(netDot); svg.appendChild(ratioDot); wrap.appendChild(svg);
+  const tip = h('div', { class: 'chart-tip' }); wrap.appendChild(tip);
+
+  function move(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const px = ((clientX - rect.left) / rect.width) * W;
+    let idx = 0, best = Infinity;
+    xs.forEach((x, i) => { const d = Math.abs(x - px); if (d < best) { best = d; idx = i; } });
+    const p = points[idx], x = xs[idx], meta = ratioMeta(p.debtRatio);
+    cursor.setAttribute('x1', x); cursor.setAttribute('x2', x); cursor.setAttribute('opacity', 0.5);
+    netDot.setAttribute('cx', x); netDot.setAttribute('cy', netY(p.net)); netDot.setAttribute('opacity', 1);
+    ratioDot.setAttribute('cx', x); ratioDot.setAttribute('cy', ratioY(p.debtRatio)); ratioDot.setAttribute('fill', meta.color); ratioDot.setAttribute('opacity', 1);
+    tip.replaceChildren(
+      h('b', { text: p.date }),
+      h('span', {}, [h('i', { style: `background:${netColor}` }), `净资产 ${money(p.net)}`]),
+      h('span', {}, [h('i', { style: `background:${meta.color}` }), `负债率 ${pct(p.debtRatio)} · ${meta.label}`])
+    );
+    tip.style.opacity = '1';
+    const left = (x / W) * rect.width - tip.offsetWidth / 2;
+    tip.style.left = `${Math.max(0, Math.min(left, rect.width - tip.offsetWidth))}px`;
+    tip.style.top = '25px';
+  }
+  function end() { cursor.setAttribute('opacity', 0); netDot.setAttribute('opacity', 0); ratioDot.setAttribute('opacity', 0); tip.style.opacity = '0'; }
+  svg.addEventListener('pointermove', (e) => move(e.clientX));
+  svg.addEventListener('pointerdown', (e) => move(e.clientX));
+  svg.addEventListener('pointerleave', end);
+  return wrap;
+}
+
+/* ---------- 信用卡欠款堆叠柱 ---------- */
+export function stackedBarChart(rows, cardSeries, { height = 220 } = {}) {
+  const wrap = h('div', { class: 'stacked-chart' });
+  const activeSeries = cardSeries.filter((s) => rows.some((r) => (+r.values[s.id] || 0) > 0));
+  if (!rows.length || !activeSeries.length) {
+    wrap.appendChild(h('div', { class: 'chart-empty', text: cardSeries.length ? '暂无信用卡欠款记录' : '暂无信用卡账户' }));
+    return wrap;
+  }
+  const W = 360, H = height, padL = 49, padR = 10, padT = 18, padB = 27;
+  const totals = rows.map((r) => activeSeries.reduce((sum, s) => sum + (+r.values[s.id] || 0), 0));
+  const scale = niceScale(totals, { floorZero: true });
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const slot = plotW / rows.length, barW = Math.max(2, Math.min(30, slot * 0.62));
+  const yOf = (v) => padT + (1 - v / scale.max) * plotH;
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, preserveAspectRatio: 'none', style: 'display:block', role: 'img', 'aria-label': '信用卡欠款堆叠柱状图' });
+  const grid = cssVar('--chart-grid'), text3 = cssVar('--text-3');
+  scale.ticks.forEach((value) => {
+    const y = yOf(value);
+    svg.appendChild(svgEl('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: grid, 'stroke-width': 1 }));
+    const label = svgEl('text', { x: padL - 7, y, 'text-anchor': 'end', 'dominant-baseline': 'middle', fill: text3, 'font-size': 10.5 });
+    label.textContent = axisMoney(value, scale); svg.appendChild(label);
+  });
+  rows.forEach((row, i) => {
+    const x = padL + i * slot + (slot - barW) / 2;
+    let running = 0;
+    activeSeries.forEach((s) => {
+      const value = Math.max(0, +row.values[s.id] || 0);
+      if (!value) return;
+      const yTop = yOf(running + value), yBottom = yOf(running);
+      svg.appendChild(svgEl('rect', { x, y: yTop, width: barW, height: Math.max(0.8, yBottom - yTop), fill: s.color, rx: 1.5 }));
+      running += value;
+    });
+  });
+  [0, ...(rows.length > 1 ? [rows.length - 1] : [])].forEach((i) => {
+    const x = padL + (i + 0.5) * slot;
+    const label = svgEl('text', { x, y: H - 3, 'text-anchor': rows.length === 1 ? 'middle' : i === 0 ? 'start' : 'end', fill: text3, 'font-size': 10.5 });
+    label.textContent = rows[i].date.slice(2); svg.appendChild(label);
+  });
+  const hover = svgEl('rect', { y: padT, width: Math.max(2, slot), height: plotH, fill: cssVar('--text'), opacity: 0, rx: 3 });
+  svg.appendChild(hover);
+  const chart = h('div', { style: 'position:relative;width:100%;touch-action:pan-y;' }, [svg]);
+  const tip = h('div', { class: 'chart-tip' }); chart.appendChild(tip); wrap.appendChild(chart);
+  const legend = h('div', { class: 'stacked-legend' }, activeSeries.map((s) => h('span', {}, [h('i', { style: `background:${s.color}` }), s.label])));
+  wrap.appendChild(legend);
+
+  function move(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const px = ((clientX - rect.left) / rect.width) * W;
+    const idx = Math.max(0, Math.min(rows.length - 1, Math.floor((px - padL) / slot)));
+    const row = rows[idx], x = padL + idx * slot;
+    hover.setAttribute('x', x); hover.setAttribute('opacity', 0.045);
+    const lines = activeSeries.map((s) => ({ ...s, value: +row.values[s.id] || 0 })).filter((s) => s.value > 0);
+    tip.replaceChildren(
+      h('b', { text: row.date }),
+      ...lines.map((s) => h('span', {}, [h('i', { style: `background:${s.color}` }), `${s.label} ${money(s.value)}`])),
+      h('strong', { text: `合计 ${money(lines.reduce((sum, s) => sum + s.value, 0))}` })
+    );
+    tip.style.opacity = '1';
+    const center = (x + slot / 2) / W * rect.width;
+    tip.style.left = `${Math.max(0, Math.min(center - tip.offsetWidth / 2, rect.width - tip.offsetWidth))}px`;
+    tip.style.top = '7px';
+  }
+  function end() { hover.setAttribute('opacity', 0); tip.style.opacity = '0'; }
   svg.addEventListener('pointermove', (e) => move(e.clientX));
   svg.addEventListener('pointerdown', (e) => move(e.clientX));
   svg.addEventListener('pointerleave', end);

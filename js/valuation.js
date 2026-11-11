@@ -7,7 +7,7 @@ function loadScript(url, timeout = 6500) {
     s.src = url;
     const done = (ok) => { s.remove(); clearTimeout(timer); ok ? resolve() : reject(new Error('加载失败')); };
     const timer = setTimeout(() => done(false), timeout);
-    s.onload = () => { clearTimeout(timer); resolve(); };
+    s.onload = () => done(true);
     s.onerror = () => done(false);
     document.head.appendChild(s);
   });
@@ -19,18 +19,33 @@ function guessMarket(code) {
   return 'sh';
 }
 
-/* 开放式基金：天天基金估值 JSONP (jsonpgz) */
+function fundDate(timestamp) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date(timestamp));
+  const pick = (type) => parts.find((p) => p.type === type)?.value;
+  return `${pick('year')}-${pick('month')}-${pick('day')}`;
+}
+
+function stockTime(raw) {
+  if (!/^\d{14}$/.test(raw || '')) return raw || '';
+  return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)} ${raw.slice(8, 10)}:${raw.slice(10, 12)}:${raw.slice(12, 14)}`;
+}
+
+/* 开放式基金：东方财富确认净值，取单位净值走势的最后一条。 */
 export function fetchFund(code) {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    window.jsonpgz = (d) => {
-      settled = true;
-      if (!d || (!d.gsz && !d.dwjz)) return reject(new Error('无数据'));
-      resolve({ price: parseFloat(d.gsz || d.dwjz), name: d.name, time: d.gztime || d.jzrq, raw: d });
-    };
-    loadScript(`https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`)
-      .then(() => setTimeout(() => { if (!settled) reject(new Error('无响应')); }, 300))
-      .catch(reject);
+  window.Data_netWorthTrend = undefined;
+  window.fS_name = undefined;
+  window.fS_code = undefined;
+  return loadScript(`https://fund.eastmoney.com/pingzhongdata/${code}.js?v=${Date.now()}`, 10000).then(() => {
+    const trend = window.Data_netWorthTrend;
+    const latest = Array.isArray(trend) ? trend[trend.length - 1] : null;
+    const price = Number(latest?.y);
+    const timestamp = Number(latest?.x);
+    if (String(window.fS_code || '') !== code || !latest || !Number.isFinite(price) || price <= 0 || !Number.isFinite(timestamp)) {
+      throw new Error('无最新净值');
+    }
+    return { price, name: window.fS_name || '', time: fundDate(timestamp), raw: latest };
   });
 }
 
@@ -45,7 +60,7 @@ export function fetchStock(code, market) {
     const f = raw.split('~');
     const price = parseFloat(f[3]);
     if (!price || isNaN(price)) throw new Error('价格解析失败');
-    return { price, name: f[1], time: f[30] || '', raw };
+    return { price, name: f[1], time: stockTime(f[30]), raw };
   });
 }
 

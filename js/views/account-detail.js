@@ -69,7 +69,9 @@ function assetBody(root, acc) {
     if (acc.valuationOverride != null && acc.valuationOverride !== '') lines.push(['手动估值', money(+acc.valuationOverride)]);
   } else if (acc.type === 'investment') {
     const mv = (+acc.holdingQty || 0) * (+acc.latestPrice || 0);
-    lines.push(['代码', acc.code || '—'], ['持仓', (+acc.holdingQty || 0) + (acc.subKind === 'fund' ? ' 份' : ' 股')], ['最新价/净值', acc.latestPrice || '—'], ['市值', money(mv), false, true]);
+    lines.push(['代码', acc.code || '—'], ['持仓', (+acc.holdingQty || 0) + (acc.subKind === 'fund' ? ' 份' : ' 股')], ['最新价/净值', acc.latestPrice || '—']);
+    if (acc.quoteDate) lines.push([acc.subKind === 'fund' ? '净值日期' : '行情时间', acc.quoteDate]);
+    lines.push(['市值', money(mv), false, true]);
     if (+acc.costTotal) {
       const costPrice = +acc.costTotal / (+acc.holdingQty || 1);
       const pnl = mv - +acc.costTotal;
@@ -82,7 +84,11 @@ function assetBody(root, acc) {
       class: 'btn block', style: 'margin-bottom:14px', text: '🔄 联网更新最新价',
       onclick: async (e) => {
         e.target.disabled = true; e.target.textContent = '获取中…';
-        try { const q = await fetchQuote(acc); updateAccount(acc.id, { latestPrice: q.price, priceUpdatedAt: new Date().toISOString() }); toast('已更新：' + q.price); }
+        try {
+          const q = await fetchQuote(acc);
+          updateAccount(acc.id, { latestPrice: q.price, quoteDate: q.time, priceUpdatedAt: new Date().toISOString() });
+          toast(`已更新：${q.price}${q.time ? ` · ${q.time}` : ''}`);
+        }
         catch (_) { toast('获取失败，请手动填写'); e.target.disabled = false; e.target.textContent = '🔄 联网更新最新价'; }
       }
     }));

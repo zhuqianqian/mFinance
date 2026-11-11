@@ -4,7 +4,7 @@ import { inlineField } from '../forms.js';
 import { getSettings, updateSettings, exportJSON, importJSON, wipeAll, getAccounts, getSnapshots, addAccount, putSnapshot } from '../store.js';
 
 // 发布时与 sw.js 的缓存版本同步，表示当前页面代码的版本。
-const APP_VERSION = 'v4';
+const APP_VERSION = 'v5';
 
 function applyThemeNow(t) {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
