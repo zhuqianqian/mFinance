@@ -35,10 +35,10 @@ function migrate(data) {
   data.snapshots = data.snapshots || [];
   return data;
 }
-function persist() {
+function persist({ notify = true } = {}) {
   try { localStorage.setItem(KEY, JSON.stringify(db)); }
   catch (e) { console.error('保存失败', e); }
-  listeners.forEach((fn) => fn(db));
+  if (notify) listeners.forEach((fn) => fn(db));
 }
 
 /* ---------- 订阅 ---------- */
@@ -55,7 +55,7 @@ export const snapshotsOf = (accountId) =>
   db.snapshots.filter((s) => s.accountId === accountId).sort((a, b) => a.date.localeCompare(b.date));
 
 /* ---------- 设置 ---------- */
-export function updateSettings(patch) { Object.assign(db.settings, patch); persist(); }
+export function updateSettings(patch, options) { Object.assign(db.settings, patch); persist(options); }
 
 /* ---------- 账户 CRUD ---------- */
 export function addAccount(acc) {

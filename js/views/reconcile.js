@@ -21,22 +21,19 @@ let state = { date: null, vals: {} };
 
 export function render() {
   const accounts = getAccounts();
-  if (!state.date) state.date = suggestedDate();
+  const date = suggestedDate();
+  if (state.date !== date) { state.date = date; state.vals = {}; }
   const root = h('div');
 
   root.appendChild(h('div', { class: 'nav-head' }, [
     h('div', {}, [h('h1', { class: 'nav-title', text: '对账' }),
-      h('div', { class: 'nav-sub', text: '校准余额并记录当日快照' })])
+      h('div', { class: 'nav-sub', text: '校准余额并记录快照' })])
   ]));
 
   if (!accounts.length) {
     root.appendChild(h('div', { class: 'empty' }, [h('div', { html: icon('reconcile') }), h('h3', { text: '暂无账户' }), h('p', { text: '先在「账户」页添加账户。' })]));
     return root;
   }
-
-  root.appendChild(h('div', { class: 'card reconcile-date' }, [
-    inputField('对账日期', { type: 'date', value: state.date, hint: `每月 ${getSettings().reconcileDay} 日对账`, onchange: (e) => { if (!e.target.value) return; state.date = e.target.value; state.vals = {}; rerender(); } })
-  ]));
 
   root.appendChild(h('div', { class: 'reconcile-actions' }, [
     h('button', { class: 'btn block', html: icon('refresh') + '<span>联网更新行情</span>', onclick: onQuote }),

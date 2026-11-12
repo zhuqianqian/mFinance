@@ -263,7 +263,6 @@ a { color: var(--accent); text-decoration: none; }
 input[type="date"]::-webkit-date-and-time-value { min-height: 20px; text-align: left; }
 input[type="date"]::-webkit-datetime-edit { min-width: 0; padding: 0; }
 .valuation-preview { padding: 12px; margin: 0 0 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--card)); color: var(--accent); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.reconcile-date .field { margin-bottom: 0; }
 .reconcile-actions { display: flex; gap: 10px; margin-bottom: 14px; }
 .reconcile-actions .btn { flex: 1; min-width: 0; font-size: 13px; padding: 10px; white-space: nowrap; }
 .reconcile-actions svg { width: 18px; height: 18px; flex-shrink: 0; }
@@ -271,8 +270,13 @@ input[type="date"]::-webkit-datetime-edit { min-width: 0; padding: 0; }
 .reconcile-rows .badge { width: 30px; height: 30px; border-radius: 8px; }
 .reconcile-rows .row-title { font-size: 14px; }
 .reconcile-rows .row-sub { font-size: 11px; }
-.reconcile-rows .compact-field { flex-basis: 120px; }
-.reconcile-rows input { text-align: right; font-family: var(--num); }
+.reconcile-rows .compact-field { width:180px; flex-basis:180px; }
+.reconcile-rows input { text-align:right; font-family:var(--num); font-variant-numeric:tabular-nums; }
+@media (max-width: 359.98px) {
+  .reconcile-rows .row { display:grid; grid-template-columns:30px minmax(0, 1fr); gap:8px 10px; padding:12px; }
+  .reconcile-rows .compact-field { grid-column:1 / -1; width:100%; grid-template-columns:64px minmax(0, 1fr); gap:10px; }
+  .reconcile-rows .compact-field .form-label { font-size:12px; }
+}
 .reconcile-summary { display: flex; flex-wrap: wrap; justify-content: space-around; text-align: center; gap: 14px; margin-top: 14px; }
 .seg { display:flex; background: var(--card-2); border-radius: 12px; padding: 3px; gap: 3px; }
 .seg button { flex:1; padding: 9px 6px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--text-2); }

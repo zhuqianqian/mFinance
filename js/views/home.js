@@ -1,7 +1,7 @@
 // js/views/home.js —— 首页：净资产卡 + 指标面板 + 趋势(可切指标/区间) + 资产构成
 import { h, money, moneyShort, pct, clear } from '../util.js';
 import { headline, series } from '../models.js';
-import { getAccounts, snapshotsOf } from '../store.js';
+import { getAccounts, getSettings, snapshotsOf, updateSettings } from '../store.js';
 import { icon, INSTITUTIONS } from '../icons.js';
 import { dualAxisChart, stackedBarChart, donutChart } from '../charts.js';
 
@@ -91,7 +91,14 @@ export function render() {
   // 趋势图（财务双轴 / 信用卡堆叠，可切换区间）
   const s = series();
   const creditData = creditChartData(s.map((p) => p.date));
-  const state = { view: 'finance', range: 0 };
+  const saved = getSettings().homeCharts || {};
+  const state = {
+    view: saved.view === 'credit' ? 'credit' : 'finance',
+    range: [0, 6, 12].includes(saved.range) ? saved.range : 0,
+    composition: saved.composition === 'liability' ? 'liability' : 'asset'
+  };
+  // 只重绘当前图表，保存选择时不触发整页重渲染或滚动跳动。
+  const saveSelection = () => updateSettings({ homeCharts: { ...state } }, { notify: false });
   const chartBox = h('div', { style: 'margin-top:8px' });
   function drawChart() {
     clear(chartBox);
@@ -105,12 +112,12 @@ export function render() {
   }
   const seg = h('div', { class: 'seg', style: 'width:auto' });
   [['finance', '财务趋势'], ['credit', '信用卡']].forEach(([v, label]) => {
-    seg.appendChild(h('button', { class: state.view === v ? 'active' : '', text: label, onclick: (e) => { state.view = v; [...seg.children].forEach((b) => b.classList.remove('active')); e.currentTarget.classList.add('active'); drawChart(); } }));
+    seg.appendChild(h('button', { class: state.view === v ? 'active' : '', text: label, onclick: (e) => { state.view = v; saveSelection(); [...seg.children].forEach((b) => b.classList.remove('active')); e.currentTarget.classList.add('active'); drawChart(); } }));
   });
-  const rangeSel = h('select', { class: 'range-sel', 'aria-label': '时间范围', onchange: (e) => { state.range = +e.target.value; drawChart(); } }, [
-    h('option', { value: '0', text: '全部' }),
-    h('option', { value: '6', text: '近 6 期' }),
-    h('option', { value: '12', text: '近 12 期' })
+  const rangeSel = h('select', { class: 'range-sel', 'aria-label': '时间范围', onchange: (e) => { state.range = +e.target.value; saveSelection(); drawChart(); } }, [
+    h('option', { value: '0', selected: state.range === 0, text: '全部' }),
+    h('option', { value: '6', selected: state.range === 6, text: '近 6 期' }),
+    h('option', { value: '12', selected: state.range === 12, text: '近 12 期' })
   ]);
   const trend = h('div', { class: 'card' }, [
     h('div', { class: 'chart-head' }, [seg, rangeSel]),
@@ -134,7 +141,9 @@ export function render() {
     }));
   }
   [['asset', '资产构成'], ['liability', '负债构成']].forEach(([kind, label]) => {
-    compositionSeg.appendChild(h('button', { class: kind === 'asset' ? 'active' : '', text: label, onclick: (e) => {
+    compositionSeg.appendChild(h('button', { class: kind === state.composition ? 'active' : '', text: label, onclick: (e) => {
+      state.composition = kind;
+      saveSelection();
       [...compositionSeg.children].forEach((b) => b.classList.toggle('active', b === e.currentTarget));
       drawComposition(kind);
     } }));
@@ -142,7 +151,7 @@ export function render() {
   root.appendChild(h('div', { class: 'card' }, [
     compositionSeg, compositionBox
   ]));
-  drawComposition('asset');
+  drawComposition(state.composition);
 
   return root;
 }
